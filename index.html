@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/png" href="/assets/icons/favicon.png" sizes="32x32">
   <title>TribeAly — 25°ATMIA</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -393,8 +394,8 @@
       <!-- GROCERY MODAL -->
       <dialog id="groceryModal" class="modal">
         <form method="dialog" class="modal-card grocery">
-        <header>
-          <h3>Grocery List — Add & Vote</h3>
+        <header class="modal-head">
+          <h4>Grocery List — Add & Vote</h4>
           <button value="close" class="icon-btn" aria-label="Close">✕</button>
         </header>
 
@@ -408,17 +409,17 @@
             </div>
             <datalist id="gAuto"><!-- populated by JS --></datalist>
             <p class="limit-note"><span id="gRemaining">10</span> items remaining you can add.</p>
-            <small class="note">Votes help shape shared costs. (Local only for now.)</small>
+            <small class="note">Votes help shape shared costs.</small>
           </section>
 
           <!-- RIGHT: shared list -->
           <section class="g-right">
             <div class="g-toolbar">
-              <strong>Shared List</strong>
+              <strong class="toolbar-head">Shared List</strong>
               <select id="gSort">
                 <option value="score">Sort: Score</option>
                 <option value="new">Sort: Newest</option>
-                <option value="alpha">Sort: A–Z</option>
+                <option value="alpha">Sort: A-Z</option>
               </select>
             </div>
 
@@ -444,8 +445,8 @@
       <!-- CALENDAR MODAL -->
       <dialog id="calendarModal" class="modal">
         <form method="dialog" class="modal-card">
-          <header>
-            <h3>Important Dates & Times</h3>
+          <header class="modal-head">
+            <h4>Important Dates & Times</h4>
             <button value="close" class="icon-btn" aria-label="Close">✕</button>
           </header>
 
@@ -458,6 +459,7 @@
               <li>Visa & Ticket Reminder: <b>Thu, Jan 1, 2026</b></li>
 
               <li>
+                Rideshares:
                 <div class="stack">
                   <b>Day 1 — Fri, Mar 13, 2026 • Arrivals: 2-3 PM (every 30 min)</b>
                   <b>Day 2 — Sat, Mar 14, 2026 • Yacht Day: 11 AM-1 PM (every 40 min)</b>
@@ -467,7 +469,7 @@
               </li>
             </ul>
 
-            <div class="row gap">
+            <div class="row gap date">
               <button id="downloadIcsBtn" class="btn" type="button">Download .ics</button>
               <button id="savePdfBtn" class="btn" type="button">Save as PDF</button>
             </div>
@@ -477,268 +479,114 @@
       </dialog>
 
 
+      <!--Budget-->
       <article class="card small" data-card="budget">
         <div class="inner">
-           <div class="face front" style="--icon-w: 220px;"> <!--Small card-->
+          <div class="face front" style="--icon-w: 220px;">
             <img class="card-icon" src="assets/icons/money.png" alt="Money">
           </div>
-          <div class="face back">
-            <div class="budget">
-              <div class="row">
-                <label>Currency</label>
-                <select id="currencySelect">
+          <div class="face back center">
+            <p style="margin:0 0 14px; color: var(--muted);">
+              ~$500 outside of travel expenses
+              <br />
+              <small>(dependent on the # of people who RSVP!)</small>
+            </p>
+            <div class="card-actions">
+              <button class="expand-btn" data-open="budgetModal" aria-haspopup="dialog">
+                See more details
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- BUDGET MODAL -->
+      <dialog id="budgetModal" class="modal">
+        <div class="modal-card">
+          <header class="modal-head">
+            <h4>Budget & Cost Breakdown</h4>
+            <button class="close-modal" aria-label="Close">✕</button>
+          </header>
+
+          <section class="modal-body">
+            <div class="row gap" style="align-items:flex-end">
+              <div>
+                <label for="budgetCurrency" class="toolbar-head">Currency</label>
+                <select id="budgetCurrency">
                   <option value="USD">$ USD</option>
                   <option value="NGN">₦ NGN</option>
                   <option value="GBP">£ GBP</option>
                   <option value="EUR">€ EUR</option>
                 </select>
               </div>
-              <div id="budgetTable" class="table"></div>
-              <small class="note">Travel not included in base cost. Estimates provided for info only.</small>
-            </div>
-          </div>
-        </div>
-      </article>
-    </section>
 
-    <!-- RSVP -->
-    <section class="rsvp">
+              <div>
+                <label for="attendeeCount" class="toolbar-head">People (for per-person)</label>
+                <input id="attendeeCount" type="number" min="1" value="10" style="width:100px; background:#0d2230; color:var(--text); border:1px solid #1e4152; border-radius:10px; padding:10px">
+              </div>
+            </div>
+
+            <div id="budgetSummary" class="meme head" style="margin-top:10px"></div>
+
+            <h5 class="toolbar-head" style="margin-top:14px">Trip Base (excl. travel & visa)</h5>
+            <div id="budgetBreakdown" class="table"></div>
+
+            <div style="border-top:1px solid #254758; margin:12px 0"></div>
+
+            <h5 class="toolbar-head">Travel Estimates</h5>
+            <div id="travelBreakdown" class="table"></div>
+
+            <small class="note">
+              Tap currency selector to convert. Per-person estimate depends on how many RSVP.
+            </small>
+          </section>
+        </div>
+      </dialog>
+
+
+
+
+
+      <!-- RSVP -->
+      <section class="rsvp">
       <h2>RSVP</h2>
-      <form id="rsvpForm">
-        <div class="row gap">
-          <input id="rsvpName" type="text" placeholder="Your name" required />
-          <input id="rsvpEmail" type="email" placeholder="Email" required />
-          <label class="checkbox">
+      <form id="rsvpForm" novalidate>
+        <div class="row gap" style="align-items:flex-end">
+          <div style="flex:1; min-width:220px">
+            <label for="rsvpName" class="toolbar-head">Name</label>
+            <input id="rsvpName" type="text" placeholder="Your name" />
+          </div>
+
+          <div style="flex:1; min-width:220px">
+            <label for="rsvpEmail" class="toolbar-head">Email <span class="req" aria-hidden="true">*</span></label>
+            <input id="rsvpEmail" type="email" placeholder="name@example.com" required />
+          </div>
+
+          <label class="checkbox" style="margin-top:4px">
             <input id="rsvpRemind" type="checkbox" />
             <span>Email me reminders</span>
           </label>
         </div>
-        <button class="btn primary">Submit RSVP</button>
+
+        <div class="row gap" style="margin-top:10px">
+          <textarea id="rsvpNotes" rows="3" placeholder="Notes — thoughts, questions, concerns…" style="width:100%; background:#0d2230; color:var(--text); border:1px solid #1e4152; border-radius:10px; padding:12px 14px"></textarea>
+        </div>
+
+        <div class="row gap" style="margin-top:10px">
+          <button class="btn primary" type="submit">Submit RSVP</button>
+        </div>
+        <small class="note" style="display:block; margin-top:-13px">
+              by submitting you agree to be emailed with reminders about the trip (no spam, I promise)
+            </small>
+
         <small id="rsvpMsg" class="note"></small>
       </form>
     </section>
-  </main>
+
 
   <footer class="footer">
     <span>© TribeAly • 25°</span>
   </footer>
-<script>
-(() => {
-  // ---------- CONFIG ----------
-  const STORAGE_KEYS = {
-    items: 'grocery_master_v1',     // [{id,name,score,createdAt,submitterId}]
-    votes: 'grocery_votes_v1',      // {itemId: -1|0|1}
-    myAdds: 'grocery_my_adds_v1',   // Set of itemIds I added
-    userId: 'grocery_user_id_v1',   // uuid
-  };
-  const MY_ADD_LIMIT = 10;
-
-  // A lightweight starter list; extend as you like.
-  const SUGGESTIONS = [
-    'apples','bananas','blueberries','strawberries','avocado','spinach','kale','arugula','broccoli',
-    'carrots','cucumber','bell peppers','tomatoes','red onions','garlic','ginger','lemons','limes',
-    'oranges','grapes','watermelon','pineapple','mango','peaches','plums',
-    'eggs','whole milk','oat milk','almond milk','yogurt','butter','cheddar','mozzarella','feta',
-    'chicken breast','ground beef','salmon','shrimp','tofu','tempeh','black beans','chickpeas','lentils',
-    'rice','quinoa','spaghetti','penne','bread','tortillas','bagels','cereal','granola',
-    'olive oil','canola oil','balsamic vinegar','soy sauce','hot sauce','ketchup','mustard','mayo',
-    'salt','pepper','cinnamon','paprika','curry powder',
-    'sparkling water','bottled water','orange juice','apple juice','coffee','tea',
-    'chips','popcorn','crackers','hummus','salsa','nuts','chocolate',
-    'toilet paper','paper towels','napkins','sponges','dish soap','laundry detergent'
-  ];
-
-  // ---------- STATE ----------
-  const getUserId = () => {
-    let id = localStorage.getItem(STORAGE_KEYS.userId);
-    if (!id && window.crypto?.randomUUID) {
-      id = crypto.randomUUID();
-      localStorage.setItem(STORAGE_KEYS.userId, id);
-    } else if (!id) {
-      // fallback
-      id = 'u_' + Math.random().toString(36).slice(2);
-      localStorage.setItem(STORAGE_KEYS.userId, id);
-    }
-    return id;
-  };
-  const USER_ID = getUserId();
-
-  const readJSON = (k, fallback) => {
-    try { return JSON.parse(localStorage.getItem(k)) ?? fallback; }
-    catch { return fallback; }
-  };
-  const writeJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
-
-  const getItems = () => readJSON(STORAGE_KEYS.items, []);
-  const setItems = (arr) => writeJSON(STORAGE_KEYS.items, arr);
-
-  const getVotes = () => readJSON(STORAGE_KEYS.votes, {}); // my votes only
-  const setVotes = (obj) => writeJSON(STORAGE_KEYS.votes, obj);
-
-  const getMyAdds = () => new Set(readJSON(STORAGE_KEYS.myAdds, []));
-  const setMyAdds = (set) => writeJSON(STORAGE_KEYS.myAdds, [...set]);
-
-  // ---------- DOM ----------
-  const modal = document.querySelector('#groceryModal');
-  const addBtn = modal.querySelector('#addGItemBtn');
-  const input = modal.querySelector('#gItem');
-  const list = modal.querySelector('#gList');
-  const emptyHint = modal.querySelector('#gEmpty');
-  const sortSel = modal.querySelector('#gSort');
-  const remainingEl = modal.querySelector('#gRemaining');
-  const datalist = modal.querySelector('#gAuto');
-
-  // populate datalist
-  const renderSuggestions = () => {
-    datalist.innerHTML = SUGGESTIONS
-      .sort((a,b) => a.localeCompare(b))
-      .map(s => `<option value="${escapeHTML(s)}"></option>`).join('');
-  };
-
-  // helpers
-  const escapeHTML = (s='') => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const normalize = (s) => s.trim().replace(/\s+/g,' ').toLowerCase();
-
-  const updateRemaining = () => {
-    const mine = getMyAdds();
-    remainingEl.textContent = Math.max(0, MY_ADD_LIMIT - mine.size);
-  };
-
-  // add item flow
-  const addItem = (raw) => {
-    const nameRaw = raw ?? input.value;
-    const name = nameRaw.trim();
-    if (!name) return;
-    const norm = normalize(name);
-    const items = getItems();
-
-    // prevent duplicates (case-insensitive)
-    if (items.some(it => normalize(it.name) === norm)) {
-      // optionally surface a tiny shake animation or toast
-      input.value = '';
-      return render(); // already exists, just re-render
-    }
-
-    // enforce per-user limit
-    const mine = getMyAdds();
-    if (mine.size >= MY_ADD_LIMIT) {
-      // show a note? up to you
-      return;
-    }
-
-    const id = (crypto.randomUUID?.() ?? ('i_' + Math.random().toString(36).slice(2)));
-    const now = Date.now();
-    const newItem = { id, name, score: 0, createdAt: now, submitterId: USER_ID };
-
-    setItems([newItem, ...items]);   // newest first
-    mine.add(id);
-    setMyAdds(mine);
-    input.value = '';
-    render();
-  };
-
-  // voting
-  const vote = (itemId, dir) => {
-    // dir: +1 or -1
-    const items = getItems();
-    const item = items.find(i => i.id === itemId);
-    if (!item) return;
-
-    const myVotes = getVotes();
-    const prev = myVotes[itemId] ?? 0; // -1, 0, +1
-
-    let next = dir;
-    // toggle if same direction clicked again
-    if (prev === dir) next = 0;
-
-    // adjust score
-    item.score += (next - prev);
-    myVotes[itemId] = next;
-
-    setItems(items);
-    setVotes(myVotes);
-    render();
-  };
-
-  // sorters
-  const sortFns = {
-    score: (a,b) => (b.score - a.score) || a.name.localeCompare(b.name),
-    new:   (a,b) => b.createdAt - a.createdAt,
-    alpha: (a,b) => a.name.localeCompare(b.name)
-  };
-
-  // render list
-  const render = () => {
-    const items = getItems().slice();
-    const myVotes = getVotes();
-
-    const sortBy = sortSel.value || 'score';
-    items.sort(sortFns[sortBy]);
-
-    list.innerHTML = items.map(it => {
-      const my = myVotes[it.id] ?? 0;
-      const upPressed = my === 1 ? 'true' : 'false';
-      const dnPressed = my === -1 ? 'true' : 'false';
-      return `
-        <li class="grocery-item" data-id="${it.id}">
-          <div class="votes">
-            <button class="vote-btn up" aria-label="Upvote" aria-pressed="${upPressed}">▲</button>
-            <div class="score" aria-label="Score">${it.score}</div>
-            <button class="vote-btn dn" aria-label="Downvote" aria-pressed="${dnPressed}">▼</button>
-          </div>
-          <div>
-            <div class="name">${escapeHTML(it.name)}</div>
-            <div class="meta">${it.submitterId === USER_ID ? 'added by you' : 'shared'}</div>
-          </div>
-          <div></div>
-        </li>
-      `;
-    }).join('');
-
-    emptyHint.hidden = items.length > 0;
-    updateRemaining();
-  };
-
-  // events
-  addBtn.addEventListener('click', () => addItem());
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); addItem(); }
-  });
-
-  list.addEventListener('click', (e) => {
-    const li = e.target.closest('.grocery-item');
-    if (!li) return;
-    const id = li.getAttribute('data-id');
-    if (e.target.classList.contains('up')) vote(id, +1);
-    if (e.target.classList.contains('dn')) vote(id, -1);
-  });
-
-  sortSel.addEventListener('change', render);
-
-  // open hook — if you already have dialog open logic, this just refreshes content when shown
-  modal.addEventListener('close', () => {
-    // optional: save/flush here
-  });
-  modal.addEventListener('cancel', () => {}); // esc
-
-  // If your open code calls dialog.showModal(), also call the two below once on page load:
-  renderSuggestions();
-  render();
-
-  // ---------- BACKEND HOOKS (Supabase later) ----------
-  // Replace getItems/setItems, getVotes/setVotes, getMyAdds/setMyAdds with async
-  // calls to your Supabase tables:
-  //
-  // Table: groceries
-  //   id (uuid) | name (text unique ci) | score (int) | created_at (timestamptz) | submitter_id (text)
-  // Table: grocery_votes
-  //   item_id (uuid) | user_id (text) | value (smallint)  -- unique (item_id, user_id)
-  //
-  // On add: insert groceries row; insert into "my adds" if you keep it server-side or enforce via policy.
-  // On vote: upsert into grocery_votes; update groceries.score = sum(votes.value).
-  // NOTE: You’ll also enforce “<=10 adds per user” with a policy/trigger.
-})();
-</script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
   window.supabase = supabase.createClient(

@@ -388,3 +388,320 @@ async function ensurePreview() {
   } catch { return null; }
 }
   */
+/*
+// ---------- CONFIG ----------
+  const STORAGE_KEYS = {
+    items: 'grocery_master_v1',     // [{id,name,score,createdAt,submitterId}]
+    votes: 'grocery_votes_v1',      // {itemId: -1|0|1}
+    myAdds: 'grocery_my_adds_v1',   // Set of itemIds I added
+    userId: 'grocery_user_id_v1',   // uuid
+  };
+  const MY_ADD_LIMIT = 10;
+
+  // A lightweight starter list; extend as you like.
+  const SUGGESTIONS = [
+    'apples','bananas','blueberries','strawberries','avocado','spinach','kale','arugula','broccoli',
+    'carrots','cucumber','bell peppers','tomatoes','red onions','garlic','ginger','lemons','limes',
+    'oranges','grapes','watermelon','pineapple','mango','peaches','plums', 'guacamole', 'ice', 'cookies',
+    'eggs','whole milk','oat milk','almond milk','yogurt','butter','cheddar','mozzarella','feta',
+    'chicken breast','ground beef','salmon','shrimp','tofu','tempeh','black beans','chickpeas','lentils',
+    'rice','quinoa','spaghetti','penne','bread','tortillas','bagels','cereal','granola',
+    'olive oil','canola oil','balsamic vinegar','soy sauce','hot sauce','ketchup','mustard','mayo',
+    'salt','pepper','cinnamon','paprika','curry powder', 'tonic water', 'ginger beer', 'fruit tray',
+    'sparkling water','bottled water','orange juice','apple juice','coffee','tea', 'brownies',
+    'chips','popcorn','crackers','hummus','salsa','nuts','chocolate', 'club soda', 'tortilla chips',
+    'toilet paper','paper towels','napkins','sponges','dish soap','laundry detergent'
+  ];
+
+  // ---------- STATE ----------
+  const getUserId = () => {
+    let id = localStorage.getItem(STORAGE_KEYS.userId);
+    if (!id && window.crypto?.randomUUID) {
+      id = crypto.randomUUID();
+      localStorage.setItem(STORAGE_KEYS.userId, id);
+    } else if (!id) {
+      // fallback
+      id = 'u_' + Math.random().toString(36).slice(2);
+      localStorage.setItem(STORAGE_KEYS.userId, id);
+    }
+    return id;
+  };
+  const USER_ID = getUserId();
+
+  const readJSON = (k, fallback) => {
+    try { return JSON.parse(localStorage.getItem(k)) ?? fallback; }
+    catch { return fallback; }
+  };
+  const writeJSON = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+  const getItems = () => readJSON(STORAGE_KEYS.items, []);
+  const setItems = (arr) => writeJSON(STORAGE_KEYS.items, arr);
+
+  const getVotes = () => readJSON(STORAGE_KEYS.votes, {}); // my votes only
+  const setVotes = (obj) => writeJSON(STORAGE_KEYS.votes, obj);
+
+  const getMyAdds = () => new Set(readJSON(STORAGE_KEYS.myAdds, []));
+  const setMyAdds = (set) => writeJSON(STORAGE_KEYS.myAdds, [...set]);
+
+  // ---------- DOM ----------
+  const modal = document.querySelector('#groceryModal');
+  const addBtn = modal.querySelector('#addGItemBtn');
+  const input = modal.querySelector('#gItem');
+  const list = modal.querySelector('#gList');
+  const emptyHint = modal.querySelector('#gEmpty');
+  const sortSel = modal.querySelector('#gSort');
+  const remainingEl = modal.querySelector('#gRemaining');
+  const datalist = modal.querySelector('#gAuto');
+
+  // populate datalist
+  const renderSuggestions = () => {
+    datalist.innerHTML = SUGGESTIONS
+      .sort((a,b) => a.localeCompare(b))
+      .map(s => `<option value="${escapeHTML(s)}"></option>`).join('');
+  };
+
+  // helpers
+  const escapeHTML = (s='') => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normalize = (s) => s.trim().replace(/\s+/g,' ').toLowerCase();
+
+  const updateRemaining = () => {
+    const mine = getMyAdds();
+    remainingEl.textContent = Math.max(0, MY_ADD_LIMIT - mine.size);
+  };
+
+  // add item flow
+  const addItem = (raw) => {
+    const nameRaw = raw ?? input.value;
+    const name = nameRaw.trim();
+    if (!name) return;
+    const norm = normalize(name);
+    const items = getItems();
+
+    // prevent duplicates (case-insensitive)
+    if (items.some(it => normalize(it.name) === norm)) {
+      // optionally surface a tiny shake animation or toast
+      input.value = '';
+      return render(); // already exists, just re-render
+    }
+
+    // enforce per-user limit
+    const mine = getMyAdds();
+    if (mine.size >= MY_ADD_LIMIT) {
+      // show a note? up to you
+      return;
+    }
+
+    const id = (crypto.randomUUID?.() ?? ('i_' + Math.random().toString(36).slice(2)));
+    const now = Date.now();
+    const newItem = { id, name, score: 0, createdAt: now, submitterId: USER_ID };
+
+    setItems([newItem, ...items]);   // newest first
+    mine.add(id);
+    setMyAdds(mine);
+    input.value = '';
+    render();
+  };
+
+  // voting
+  const vote = (itemId, dir) => {
+    // dir: +1 or -1
+    const items = getItems();
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    const myVotes = getVotes();
+    const prev = myVotes[itemId] ?? 0; // -1, 0, +1
+
+    let next = dir;
+    // toggle if same direction clicked again
+    if (prev === dir) next = 0;
+
+    // adjust score
+    item.score += (next - prev);
+    myVotes[itemId] = next;
+
+    setItems(items);
+    setVotes(myVotes);
+    render();
+  };
+
+  // sorters
+  const sortFns = {
+    score: (a,b) => (b.score - a.score) || a.name.localeCompare(b.name),
+    new:   (a,b) => b.createdAt - a.createdAt,
+    alpha: (a,b) => a.name.localeCompare(b.name)
+  };
+
+  // render list
+  const render = () => {
+    const items = getItems().slice();
+    const myVotes = getVotes();
+
+    const sortBy = sortSel.value || 'score';
+    items.sort(sortFns[sortBy]);
+
+    list.innerHTML = items.map(it => {
+      const my = myVotes[it.id] ?? 0;
+      const upPressed = my === 1 ? 'true' : 'false';
+      const dnPressed = my === -1 ? 'true' : 'false';
+      return `
+        <li class="grocery-item" data-id="${it.id}">
+          <div class="votes">
+            <button class="vote-btn up" aria-label="Upvote" aria-pressed="${upPressed}">▲</button>
+            <div class="score" aria-label="Score">${it.score}</div>
+            <button class="vote-btn dn" aria-label="Downvote" aria-pressed="${dnPressed}">▼</button>
+          </div>
+          <div>
+            <div class="name">${escapeHTML(it.name)}</div>
+            <div class="meta">${it.submitterId === USER_ID ? 'added by you' : 'shared'}</div>
+          </div>
+          <div></div>
+        </li>
+      `;
+    }).join('');
+
+    emptyHint.hidden = items.length > 0;
+    updateRemaining();
+  };
+
+  // events
+  addBtn.addEventListener('click', () => addItem());
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addItem(); }
+  });
+
+  list.addEventListener('click', (e) => {
+    const li = e.target.closest('.grocery-item');
+    if (!li) return;
+    const id = li.getAttribute('data-id');
+    if (e.target.classList.contains('up')) vote(id, +1);
+    if (e.target.classList.contains('dn')) vote(id, -1);
+  });
+
+  sortSel.addEventListener('change', render);
+
+  // open hook — if you already have dialog open logic, this just refreshes content when shown
+  modal.addEventListener('close', () => {
+    // optional: save/flush here
+  });
+  modal.addEventListener('cancel', () => {}); // esc
+
+  // If your open code calls dialog.showModal(), also call the two below once on page load:
+  renderSuggestions();
+  render();
+
+  // ---------- BACKEND HOOKS (Supabase later) ----------
+  // Replace getItems/setItems, getVotes/setVotes, getMyAdds/setMyAdds with async
+  // calls to your Supabase tables:
+  //
+  // Table: groceries
+  //   id (uuid) | name (text unique ci) | score (int) | created_at (timestamptz) | submitter_id (text)
+  // Table: grocery_votes
+  //   item_id (uuid) | user_id (text) | value (smallint)  -- unique (item_id, user_id)
+  //
+  // On add: insert groceries row; insert into "my adds" if you keep it server-side or enforce via policy.
+  // On vote: upsert into grocery_votes; update groceries.score = sum(votes.value).
+  // NOTE: You’ll also enforce “<=10 adds per user” with a policy/trigger.
+
+  */
+
+  /* CSS
+  
+.modal-card.grocery .g-body {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 1.25rem;
+  align-items: start;
+  margin: 20px;
+  overflow: hidden;
+  min-height: 0;
+  flex: 1;
+}
+
+@media (max-width: 800px) {
+  .modal-card.grocery .g-body { grid-template-columns: 1fr; }
+}
+dialog.modal{
+  width: min(960px, 92vw);
+  max-height: 88vh;
+}
+.modal-card{
+  display: grid;
+  grid-template-rows: auto 1fr auto; 
+  max-height: 88vh;
+}
+.modal-body{ overflow: auto; }         
+
+.modal-card.grocery {
+  display: flex;
+  flex-direction: column;
+  height: 80vh;          /* you had this
+  max-height: 80vh;      /* ensure it can't grow past viewport 
+  overflow: hidden; 
+}
+
+.modal-card.grocery .g-left .limit-note {
+  margin-top: .5rem;
+  font-size: .9rem;
+  opacity: .8;
+}
+
+.g-right .g-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: .5rem;
+}
+
+.g-body{
+  min-height: 0;
+  display: block;
+}
+.g-right{
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.toolbar-head{color: var(--muted);}
+
+.grocery-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;          /* <== scrolls when long
+  padding: 0.25rem;
+  margin: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  -webkit-overflow-scrolling: touch;
+  gap: 0.4rem;
+}
+.grocery-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: .75rem;
+  padding: .2rem .4rem;
+  border: 1px solid var(--outline, #ddd);
+  border-radius: .2rem;
+  background: var(--card, #fff);
+}
+
+.grocery-item .votes {
+  display: grid;
+  grid-auto-rows: 1.25rem;
+  justify-items: center;
+}
+.grocery-item .vote-btn {
+  border: none; background: transparent; cursor: pointer; line-height: 1;
+  font-size: 1rem; padding: 0; color: var(--muted);
+}
+.grocery-item .vote-btn[aria-pressed="true"] { filter: saturate(1.3); transform: translateY(-1px); color: var(--muted);}
+.grocery-item .score { font-weight: 600; min-width: 1.5ch; text-align: center; color: var(--muted); }
+
+.grocery-item .name { font-weight: 500; color: var(--muted); }
+.grocery-item .meta { font-size: .8rem; opacity: .7; }
+
+.empty-hint { opacity: .7; text-align: center; padding: .5rem 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+*/

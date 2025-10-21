@@ -732,6 +732,7 @@ dialog.modal::backdrop{
 
 .row{display:flex; align-items:center}
 .row.gap{gap:10px; flex-wrap:wrap; margin-bottom: 10px;}
+.row.gap.date{gap:10px; flex-wrap:wrap; margin-top: 30px;}
 
 /* Center the PDF button row inside the Suitcase card’s back face */
 .card[data-card="pack"] .face.back .row.gap {
@@ -756,9 +757,16 @@ dialog.modal::backdrop{
   background:linear-gradient(90deg, rgba(255,140,83,.15), rgba(127,211,255,.15));
   border:1px dashed #2a4e61;
 }
+.meme.head{background: linear-gradient(90deg, #ff7e5f, #feb47b); /* your gradient */
+  -webkit-background-clip: text;  /* clip background to text */
+  -webkit-text-fill-color: transparent; /* make actual text transparent */
+  background-clip: text; /* for other browsers that support it */
+  color: transparent; /* fallback */}
 
-.budget .table{margin-top:8px; display:grid; gap:6px}
-.budget .row{justify-content:flex-start; gap:10px}
+.budget.table{margin-top:8px; display:grid; gap:6px; }
+.budget.row{justify-content:flex-start; gap:10px; color: var(--muted);}
+#budgetBreakdown{color: var(--muted);}
+#travelBreakdown{color: var(--muted); padding-bottom: 20px;}
 
 
 /* ===== Vinyl Player ===== */
@@ -891,39 +899,113 @@ dialog.modal::backdrop{
 .pick-item img { width:40px; height:40px; border-radius:6px; object-fit:cover; }
 .pick-item .event { color: var(--a2); font-weight:700; font-size:.9rem; }
 
+/* ===== Grocery Modal (Option B: only the list scrolls) ===== */
 
-/* Modal layout */
+/* Use the base .modal-card grid from your global styles.
+   Do NOT switch this card to flex; inherit the grid. */
+
+/* Body: two columns inside the scroll row of the card.
+   We CONTAIN scrolling here; the list inside will actually scroll. */
+
+   /* keep scroll gestures inside the modal/list */
+.modal-card.grocery { 
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 60vh;
+  width: min(960px, 92vw);
+  overflow: hidden;
+} 
 .modal-card.grocery .g-body {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
   gap: 1.25rem;
   align-items: start;
+  margin: 20px;
+  min-height: 0;       /* allow children to shrink */
+  overflow: hidden;    /* contain the inner scroller */
 }
 
 @media (max-width: 800px) {
   .modal-card.grocery .g-body { grid-template-columns: 1fr; }
 }
 
+.modal-card.grocery .g-right {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.modal-card.grocery .grocery-list {
+  max-height: calc(60vh - 300px);
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  margin: 0;
+}
+
+/* Keep your global dialog & modal layout (unchanged) */
+dialog.modal{
+  width: min(960px, 92vw);
+  max-height: 88vh;
+}
+.modal-card{
+  display: grid;
+  grid-template-rows: auto 1fr auto;  /* header | body | footer */
+  max-height: 88vh;
+}
+.card.small, .card.big, .card .inner { min-width: 0; }
+
+.toolbar-head{color: var(--muted);}
+/* .modal-body may be used by other modals; keep as-is */
+.modal-body{ overflow: auto; }
+.grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+/* Left-side notes */
 .modal-card.grocery .g-left .limit-note {
   margin-top: .5rem;
   font-size: .9rem;
   opacity: .8;
 }
 
+/* Right column: make it a flex column so the list can flex */
 .g-right .g-toolbar {
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: .5rem;
 }
+.g-right{
+  display: flex;
+  flex-direction: column;
+  min-height: 0;     /* critical for inner scroll */
+  overflow: hidden;  /* contain the list */
+}
 
-.grocery-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+/* The LIST is the only scroller */
+.grocery-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;          /* <== scrolls when long */
+  -webkit-overflow-scrolling: touch;
+  padding: 0.25rem;
+  margin: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Compact items */
 .grocery-item {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: .75rem;
-  padding: .6rem .75rem;
+  padding: .2rem .4rem;
   border: 1px solid var(--outline, #ddd);
-  border-radius: .75rem;
+  border-radius: .2rem;
   background: var(--card, #fff);
 }
 
@@ -934,21 +1016,27 @@ dialog.modal::backdrop{
 }
 .grocery-item .vote-btn {
   border: none; background: transparent; cursor: pointer; line-height: 1;
-  font-size: 1rem; padding: 0;
+  font-size: 1rem; padding: 0; color: var(--muted);
 }
-.grocery-item .vote-btn[aria-pressed="true"] { filter: saturate(1.3); transform: translateY(-1px); }
-.grocery-item .score { font-weight: 600; min-width: 1.5ch; text-align: center; }
+.grocery-item .vote-btn[aria-pressed="true"] { filter: saturate(1.3); transform: translateY(-1px); color: var(--muted); }
+.grocery-item .score { font-weight: 600; min-width: 1.5ch; text-align: center; color: var(--muted); }
 
-.grocery-item .name { font-weight: 500; }
+.grocery-item .name { font-weight: 500; color: var(--muted); }
 .grocery-item .meta { font-size: .8rem; opacity: .7; }
 
 .empty-hint { opacity: .7; text-align: center; padding: .5rem 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 
+.grocery-list { overscroll-behavior: contain; }
 
-/* RSVP */
-.rsvp{margin:30px 0 10px; background:var(--card); border:1px solid #1b3b4b; border-radius:18px; padding:16px}
+
+.grid > .rsvp {
+  grid-column: 1 / -1;   /* take a whole row in the 12-col grid */
+  width: auto;           /* don't use 100vw/calc here */
+  margin-inline: 0;      /* align with the grid container edges */
+}
+.rsvp{margin:30px 0 10px; background:var(--card); border:1px solid #1b3b4b; border-radius:18px; padding:16px; grid-column: 1 / -1;  }
 .rsvp h2{margin:0 0 8px}
 .checkbox{display:flex; align-items:center; gap:8px; color:var(--muted)}
 .rsvp input{background:#0d2230; color:var(--text); border:1px solid #1e4152; border-radius:10px; padding:12px 14px}
@@ -973,15 +1061,7 @@ dialog.modal::backdrop{
   background:#0d2230; color:var(--text); border:1px solid #1e4152; border-radius:10px; padding:10px
 }
 
-.grocery-list{list-style:none; margin:12px 0 0; padding:0; display:grid; gap:8px}
-.grocery-list li{
-  display:grid; grid-template-columns:1fr auto; gap:6px; align-items:center;
-  background:#0d2230; border:1px solid #1e4152; border-radius:12px; padding:10px 12px;
-}
-.vote{display:flex; align-items:center; gap:6px}
-.vote button{background:transparent; border:1px solid #2f5668; color:var(--text); border-radius:10px; padding:6px 8px; cursor:pointer}
-.count{min-width:2ch; text-align:center; color:var(--a2); font-weight:700}
-
+.calendar-block {margin:20px;}
 .calendar-block .bullets { list-style: disc; padding-left: 1.25rem; }
 .calendar-block .stack b { display:block; margin: .25rem 0; }
 @media print {
@@ -990,10 +1070,21 @@ dialog.modal::backdrop{
   .icon-btn { display: none !important; }
 }
 
+.req { color: var(--accent); font-weight: 800; margin-left: 2px; }
 
 
-/* Footer */
-.footer{display:flex; justify-content:center; padding:26px 10px; color:var(--muted)}
+
+.footer {
+  display: grid;
+  place-items: center;
+  padding: 26px 10px;
+  color: var(--muted);
+  text-align: center;
+  grid-column: 1 / -1;
+  justify-self: center;
+
+}
+
 
 /* universal hidden toggle */
 .hidden {

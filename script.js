@@ -1332,51 +1332,222 @@ function schedulePicksSync() {
 
 
 
-/* ====== Grocery List: add & vote (per codename, local only) ====== */
-const gItem = document.getElementById('gItem');
-const addGItemBtn = document.getElementById('addGItemBtn');
-const gList = document.getElementById('gList');
-const GROCERY_KEY = "tribealy::grocery::";
+/* ====== GROCERIES (Supabase, realtime, shared) ====== */
+(() => {
+  // ---------- DOM ----------
+  const modal       = document.getElementById('groceryModal');
+  if (!modal) return; // in case this page doesn't have the modal
 
-function groceryKey(){
-  const cn = inSession() || 'guest';
-  return GROCERY_KEY + cn;
-}
-function getGrocery(){
-  return JSON.parse(localStorage.getItem(groceryKey()) || '[]');
-}
-function setGrocery(arr){
-  localStorage.setItem(groceryKey(), JSON.stringify(arr));
-}
-function renderGrocery(){
-  const arr = getGrocery();
-  gList.innerHTML = '';
-  arr.sort((a,b)=> b.votes - a.votes);
-  arr.forEach((it, idx)=>{
-    const li = document.createElement('li');
-    const label = document.createElement('div');
-    label.textContent = it.name;
-    const vote = document.createElement('div');
-    vote.className = 'vote';
-    const down = document.createElement('button'); down.textContent = '-';
-    const up = document.createElement('button'); up.textContent = '+';
-    const count = document.createElement('span'); count.className='count'; count.textContent = it.votes;
-    down.addEventListener('click', ()=>{ const a=getGrocery(); a[idx].votes--; setGrocery(a); renderGrocery(); });
-    up.addEventListener('click', ()=>{ const a=getGrocery(); a[idx].votes++; setGrocery(a); renderGrocery(); });
-    vote.append(down, count, up);
-    li.append(label, vote);
-    gList.appendChild(li);
+  const input       = modal.querySelector('#gItem');
+  const addBtn      = modal.querySelector('#addGItemBtn');
+  const listEl      = modal.querySelector('#gList');
+  const emptyHint   = modal.querySelector('#gEmpty');
+  const sortSel     = modal.querySelector('#gSort');
+  const remainingEl = modal.querySelector('#gRemaining');
+  const datalist    = modal.querySelector('#gAuto');
+
+  // ---------- CONFIG / STATE ----------
+  const MY_ADD_LIMIT = 10;
+
+  // Anonymous, stable per-browser user id (used for per-user add limit & votes)
+  const USER_ID_KEY = 'grocery_user_id_v1';
+  const getUserId = () => {
+    let id = localStorage.getItem(USER_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID?.() ?? ('u_' + Math.random().toString(36).slice(2));
+      localStorage.setItem(USER_ID_KEY, id);
+    }
+    return id;
+  };
+  const USER_ID = getUserId();
+
+  // Optional client-side suggestions for the input datalist
+  const SUGGESTIONS = [
+    'apples','bananas','blueberries','strawberries','avocado','spinach','kale','arugula','broccoli',
+    'carrots','cucumber','bell peppers','tomatoes','red onions','garlic','ginger','lemons','limes',
+    'oranges','grapes','watermelon','pineapple','mango','peaches','plums', 'guacamole', 'ice', 'cookies',
+    'eggs','whole milk','oat milk','almond milk','yogurt','butter','cheddar','mozzarella','feta',
+    'chicken breast','ground beef','salmon','shrimp','tofu','tempeh','black beans','chickpeas','lentils',
+    'rice','quinoa','spaghetti','penne','bread','tortillas','bagels','cereal','granola',
+    'olive oil','canola oil','balsamic vinegar','soy sauce','hot sauce','ketchup','mustard','mayo',
+    'salt','pepper','cinnamon','paprika','curry powder', 'tonic water', 'ginger beer', 'fruit tray',
+    'sparkling water','bottled water','orange juice','apple juice','coffee','tea', 'brownies',
+    'chips','popcorn','crackers','hummus','salsa','nuts','chocolate', 'club soda', 'tortilla chips',
+    'toilet paper','paper towels','napkins','sponges','dish soap','laundry detergent'
+  ];
+
+  // In-memory view state
+  let items = [];            // rows from public.groceries
+  let myVotes = {};          // {itemId: -1|0|1}
+  let myAddsCount = 0;
+
+  // ---------- HELPERS ----------
+  const escapeHTML = (s='') => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&gt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normalize  = (s='') => s.trim().replace(/\s+/g,' ').toLowerCase();
+
+  function renderSuggestions() {
+    datalist.innerHTML = [...new Set(SUGGESTIONS)].sort((a,b)=>a.localeCompare(b))
+      .map(s => `<option value="${escapeHTML(s)}"></option>`).join('');
+  }
+  function updateRemaining() {
+    remainingEl.textContent = Math.max(0, MY_ADD_LIMIT - myAddsCount);
+  }
+  function sortItems(arr) {
+    const by = sortSel.value || 'score';
+    const copy = arr.slice();
+    if (by === 'score') copy.sort((a,b)=> (b.score - a.score) || a.name.localeCompare(b.name));
+    else if (by === 'new') copy.sort((a,b)=> new Date(b.created_at) - new Date(a.created_at));
+    else copy.sort((a,b)=> a.name.localeCompare(b.name));
+    return copy;
+  }
+  function render() {
+    const arr = sortItems(items);
+    listEl.innerHTML = arr.map(it => {
+      const my = myVotes[it.id] ?? 0;
+      return `
+        <li class="grocery-item" data-id="${it.id}">
+          <div class="votes">
+            <button class="vote-btn up" aria-label="Upvote" aria-pressed="${my===1}">▲</button>
+            <div class="score" aria-label="Score">${it.score}</div>
+            <button class="vote-btn dn" aria-label="Downvote" aria-pressed="${my===-1}">▼</button>
+          </div>
+          <div>
+            <div class="name">${escapeHTML(it.name)}</div>
+            <div class="meta">${it.submitter_id === USER_ID ? 'added by you' : 'shared'}</div>
+          </div>
+          <div></div>
+        </li>
+      `;
+    }).join('');
+    emptyHint.hidden = arr.length > 0;
+    updateRemaining();
+  }
+
+  // ---------- SUPABASE INTEGRATION GROCERIES ----------
+  async function ensureSeeded() {
+    // Seeds the list with the 13 defaults if table is empty
+    try { await supabase.rpc('seed_default_groceries'); } catch {}
+  }
+
+  async function loadAll() {
+    // items
+    const orderCol = (sortSel.value === 'alpha') ? 'name' : (sortSel.value === 'new' ? 'created_at' : 'score');
+    const ascending = sortSel.value !== 'score';
+    const { data: rows, error } = await supabase
+      .from('groceries')
+      .select('*')
+      .order(orderCol, { ascending });
+
+    if (!error && rows) items = rows;
+
+    // my votes
+    const { data: votes } = await supabase
+      .from('grocery_votes')
+      .select('item_id,value')
+      .eq('user_id', USER_ID);
+
+    myVotes = {};
+    (votes || []).forEach(v => { myVotes[v.item_id] = v.value; });
+
+    // my adds (for limit)
+    myAddsCount = items.filter(i => i.submitter_id === USER_ID).length;
+
+    render();
+  }
+
+  async function addItem(rawName) {
+    const name = (rawName ?? input.value).trim();
+    if (!name) return;
+
+    // prevent client-side dupes
+    if (items.some(i => normalize(i.name) === normalize(name))) {
+      input.value = '';
+      return render();
+    }
+    // limit enforcement (also double-enforced in RPC)
+    if (myAddsCount >= MY_ADD_LIMIT) {
+      // optional toast here
+      return;
+    }
+
+    const { data, error } = await supabase.rpc('add_grocery', { p_name: name, p_user: USER_ID });
+    if (error) {
+      // optionally show error.message
+      return;
+    }
+
+    input.value = '';
+
+    // optimistic add if not already present
+    if (!items.find(i => i.id === data.id)) {
+      items.unshift(data);
+      if (data.submitter_id === USER_ID) myAddsCount++;
+      render();
+    }
+  }
+
+  async function sendVote(itemId, dir) {
+    const prev = myVotes[itemId] ?? 0;
+    const next = (prev === dir) ? 0 : dir;
+
+    // optimistic UI
+    myVotes[itemId] = next;
+    const item = items.find(i => i.id === itemId);
+    if (item) item.score += (next - prev);
+    render();
+
+    const { error } = await supabase.rpc('upsert_grocery_vote', {
+      p_item: itemId, p_user: USER_ID, p_value: next
+    });
+    if (error) {
+      // revert
+      myVotes[itemId] = prev;
+      if (item) item.score += (prev - next);
+      render();
+    }
+  }
+
+  // Realtime: reflect inserts/updates/deletes from others immediately
+  const channel = supabase
+    .channel('groceries-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'groceries' }, (payload) => {
+      if (payload.eventType === 'INSERT') {
+        const row = payload.new;
+        if (!items.find(i => i.id === row.id)) items.unshift(row);
+      } else if (payload.eventType === 'UPDATE') {
+        const idx = items.findIndex(i => i.id === payload.new.id);
+        if (idx >= 0) items[idx] = payload.new;
+      } else if (payload.eventType === 'DELETE') {
+        items = items.filter(i => i.id !== payload.old.id);
+      }
+      myAddsCount = items.filter(i => i.submitter_id === USER_ID).length;
+      render();
+    })
+    .subscribe();
+
+  // ---------- EVENTS ----------
+  addBtn.addEventListener('click', () => addItem());
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); addItem(); }
   });
-}
-addGItemBtn.addEventListener('click', ()=>{
-  const name = (gItem.value || '').trim();
-  if (!name) return;
-  const arr = getGrocery();
-  if (arr.some(x=> x.name.toLowerCase() === name.toLowerCase())) { gItem.value=''; return; }
-  arr.push({name, votes:0});
-  setGrocery(arr); gItem.value=''; renderGrocery();
-});
-renderGrocery();
+  listEl.addEventListener('click', (e) => {
+    const li = e.target.closest('.grocery-item');
+    if (!li) return;
+    const id = li.getAttribute('data-id');
+    if (e.target.classList.contains('up')) return sendVote(id, +1);
+    if (e.target.classList.contains('dn')) return sendVote(id, -1);
+  });
+  sortSel.addEventListener('change', render);
+
+  // ---------- BOOT ----------
+  renderSuggestions();
+  ensureSeeded().then(loadAll);
+})();
+
+
+
+
+
 
 (() => {
   // ---- Helpers
@@ -1518,15 +1689,12 @@ renderGrocery();
   });
 })();
 
-/* ====== Budget: currency & estimates ====== */
-const currencySelect = document.getElementById('currencySelect');
-const budgetTable = document.getElementById('budgetTable');
-
+/* ====== Budget: currency & estimates (modal) ====== */
 // Base amounts in USD
 const baseCosts = [
   ['Villa (3 nights)', 2800],
   ['Yacht (4 hrs)', 1600],
-  ['Chef dinner', 600],
+  ['Chef dinner', 700],
   ['Groceries & supplies', 400],
   ['Clubs & misc', 300]
 ];
@@ -1538,72 +1706,164 @@ const travelEst = [
   ['Travel — Japan', 1400]
 ];
 
-// FX rates (example static)
+// FX rates (tune as needed)
 const FX = { USD:1, NGN:1600, GBP:0.78, EUR:0.92 };
 const SYMBOL = { USD:'$', NGN:'₦', GBP:'£', EUR:'€' };
+const convert = (usd, cur) => usd * FX[cur];
+const fmt0 = (n) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 
-function convert(usd, cur){ return usd * FX[cur]; }
-function fmt(n){ return n.toLocaleString(undefined, {maximumFractionDigits:0}); }
+function totalBaseUSD(){ return baseCosts.reduce((s, [,v])=> s+v, 0); }
 
-function renderBudget(){
-  const cur = currencySelect.value;
+// Elements inside modal
+const budgetCurrency = document.getElementById('budgetCurrency');
+const attendeeCount  = document.getElementById('attendeeCount');
+const budgetBreakdown = document.getElementById('budgetBreakdown');
+const travelBreakdown = document.getElementById('travelBreakdown');
+const budgetSummary   = document.getElementById('budgetSummary');
+
+// Try to guess attendees from locally saved RSVPs (nice-to-have)
+function guessAttendeeCount(){
+  try {
+    const arr = JSON.parse(localStorage.getItem("tribealy::rsvp::" + (inSession() || 'guest')) || '[]');
+    if (Array.isArray(arr) && arr.length > 0) return arr.length;
+  } catch {}
+  return Number(attendeeCount?.value || 10);
+}
+
+function renderBudgetModal(){
+  if (!budgetCurrency || !budgetBreakdown || !travelBreakdown || !budgetSummary) return;
+  const cur = budgetCurrency.value;
   const sym = SYMBOL[cur];
-  budgetTable.innerHTML = '';
 
-  // Base cost
-  const totalUSD = baseCosts.reduce((s, [,v])=> s+v, 0);
-  const totalCur = convert(totalUSD, cur);
+  // totals
+  const tUSD = totalBaseUSD();
+  const tCur = convert(tUSD, cur);
 
-  const head = document.createElement('div');
-  head.innerHTML = `<strong>Trip Base Cost (excl. travel & visa):</strong> ${sym}${fmt(totalCur)}`
-  budgetTable.appendChild(head);
+  // attendees & per-person
+  const ppl = Math.max(1, Number(attendeeCount.value || guessAttendeeCount() || 10));
+  const perUSD = tUSD / ppl;
+  const perCur = convert(perUSD, cur);
 
+  // headline
+  budgetSummary.textContent = `Total base: ${sym}${fmt0(tCur)} • ~${sym}${fmt0(perCur)} / person (excl. travel & visa)`;
+
+  // base rows
+  budgetBreakdown.innerHTML = '';
   baseCosts.forEach(([label, usd])=>{
     const row = document.createElement('div');
-    row.textContent = `${label} — ${sym}${fmt(convert(usd, cur))}`;
-    budgetTable.appendChild(row);
+    row.className = 'row';
+    row.style.gap = '10px';
+    row.innerHTML = `<span>${label}</span> — <strong>${sym}${fmt0(convert(usd, cur))}</strong>`;
+    budgetBreakdown.appendChild(row);
   });
 
-  const hr = document.createElement('div');
-  hr.style.borderTop = '1px solid #254758';
-  hr.style.margin = '8px 0';
-  budgetTable.appendChild(hr);
-
-  const travelHead = document.createElement('div');
-  travelHead.innerHTML = `<strong>Travel Estimates:</strong>`;
-  budgetTable.appendChild(travelHead);
-
+  // travel rows
+  travelBreakdown.innerHTML = '';
   travelEst.forEach(([label, usd])=>{
     const row = document.createElement('div');
-    row.textContent = `${label} — ${sym}${fmt(convert(usd, cur))}`;
-    budgetTable.appendChild(row);
+    row.className = 'row';
+    row.style.gap = '10px';
+    row.innerHTML = `<span>${label}</span> — <strong>${sym}${fmt0(convert(usd, cur))}</strong>`;
+    travelBreakdown.appendChild(row);
   });
 }
-currencySelect.addEventListener('change', renderBudget);
-renderBudget();
+
+// Re-render on interactions + whenever the modal opens
+budgetCurrency?.addEventListener('change', renderBudgetModal);
+attendeeCount?.addEventListener('input', renderBudgetModal);
+// When opened via [data-open="budgetModal"], the <dialog> gets [open]
+(() => {
+  const dlg = document.getElementById('budgetModal');
+  if (!dlg) return;
+  const obs = new MutationObserver(() => { if (dlg.open) { if (!attendeeCount.value) attendeeCount.value = String(guessAttendeeCount()); renderBudgetModal(); } });
+  obs.observe(dlg, { attributes:true, attributeFilter:['open'] });
+})();
+
 
 /* ====== RSVP ====== */
+/* ====== RSVP (autofill + validation + backend) ====== */
 const rsvpForm = document.getElementById('rsvpForm');
-const rsvpMsg = document.getElementById('rsvpMsg');
+const rsvpMsg  = document.getElementById('rsvpMsg');
 const RSVP_KEY = "tribealy::rsvp::";
 function rsvpKey(){ return RSVP_KEY + (inSession() || 'guest'); }
 
-rsvpForm.addEventListener('submit', (e)=>{
-  e.preventDefault();
-  const name = document.getElementById('rsvpName').value.trim();
-  const email = document.getElementById('rsvpEmail').value.trim();
-  const remind = document.getElementById('rsvpRemind').checked;
-  if (!name || !email) return;
+// Autofill name: "First (Nickname) Last" if nickname exists and differs from first (case-insensitive)
+(function autofillRSVPName(){
+  const nameEl = document.getElementById('rsvpName');
+  if (!nameEl) return;
+  const fn = (sessionStorage.getItem('tribealy::session::first_name') || '').trim();
+  const ln = (sessionStorage.getItem('tribealy::session::last_name')  || '').trim();
+  const nn = (sessionStorage.getItem('tribealy::session::nickname')   || '').trim();
 
-  const entry = { name, email, remind, ts: Date.now() };
+  if (fn || ln) {
+    const nickPart = nn && nn.toLowerCase() !== fn.toLowerCase() ? ` (${nn})` : '';
+    nameEl.value = `${fn || ''}${nickPart}${ln ? ` ${ln}` : ''}`.trim();
+  }
+})();
+
+function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+async function sendRSVPToBackend(entry){
+  try {
+    const { error } = await window.supabase
+      .from('rsvps')
+      .insert([{
+        trip_id: 'bahamas-2026',
+        codename: inSession() || null,
+        name: entry.name || null,
+        email: entry.email,
+        remind: !!entry.remind,
+        notes: entry.notes || null,
+        user_id: window.supabase.auth.getUser ? (await window.supabase.auth.getUser())?.data?.user?.id ?? null : null
+      }]);
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.warn('[rsvp] backend insert failed:', e?.message || e);
+    return false;
+  }
+}
+
+
+rsvpForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+
+  const nameEl  = document.getElementById('rsvpName');
+  const emailEl = document.getElementById('rsvpEmail');
+  const notesEl = document.getElementById('rsvpNotes');
+
+  const name   = (nameEl.value  || '').trim();
+  const email  = (emailEl.value || '').trim();
+  const notes  = (notesEl?.value || '').trim();
+  const remind = document.getElementById('rsvpRemind').checked;
+
+  if (!email) {
+    rsvpMsg.textContent = 'Email is required.';
+    emailEl.focus();
+    return;
+  }
+  if (!isValidEmail(email)) {
+    rsvpMsg.textContent = 'Please enter a valid email.';
+    emailEl.focus();
+    return;
+  }
+
+  // Save locally (append to an array per session codename)
+  const entry = { name, email, remind, notes, ts: Date.now() };
   const arr = JSON.parse(localStorage.getItem(rsvpKey()) || '[]');
   arr.push(entry);
   localStorage.setItem(rsvpKey(), JSON.stringify(arr));
 
-  rsvpMsg.textContent = "RSVP received — see you at 25°!";
+  // Ship to backend
+  const ok = await sendRSVPToBackend(entry);
+
+  rsvpMsg.textContent = ok
+    ? 'RSVP received — see you at 25°!'
+    : 'RSVP saved locally — backend will be set up shortly.';
   rsvpForm.reset();
-  setTimeout(()=> rsvpMsg.textContent = '', 2000);
+  setTimeout(()=> rsvpMsg.textContent = '', 2600);
 });
+
 
 /* ====== Small QoL: Close modals on backdrop click ====== */
 document.querySelectorAll('dialog.modal').forEach(dlg=>{
