@@ -277,9 +277,10 @@ document.addEventListener('click', (e) => {
 
 /* ====== Suitcase: Pack List (session only) ====== */
 const defaultPack = [
-  "White outfit (Day 1)", "All-black outfit (MI6 night)", "Yacht fit",
-  "Nigerian attire (Dinner)", "Swimwear", "Sunscreen", "Sunglasses",
-  "Comfy shoes", "Phone charger", "Travel docs/ID"
+  "All-White outfit (Games Night)", "All-Black outfit (MI6 night)", "Sunset Themed outfit (Yacht day)",
+  "Nigerian attire (Dinner)*", "Green and White Striped Swimwear (Beach Day)", "Toiletries", "Extra Swimwear", 
+  "Sunscreen!", "Sunglasses", "Slippers/Sandals", "Game (Uno/Jenga/Never Have I Ever)*", "Underwear", "Extra top and pants (lightweight)*",
+  "Comfy shoes", "Camera*", "Phone charger", "Travel docs/ID"
 ];
 const PACK_KEY = "tribealy::pack::"; // session-only stored with codename in key (sessionStorage)
 const packListEl = document.getElementById('packList');
@@ -372,41 +373,92 @@ function sizesStorageKey() {
   return SIZES_KEY + cn;
 }
 
+const range = (start, end, step = 1) => {
+  const out = [];
+  for (let v = start; v <= end; v += step) out.push(String(v));
+  return out;
+}
+
+const withPlaceholder = (opts, text = '- Select -') => [''].concat(opts); //empty value first 
+
 function fieldsForGender(g) {
   if (g === 'female') return [
-    ['Top', 'S/M/L/XL'],
-    ['Bottom', 'S/M/L/XL'],
-    ['Bust (cm)', 'e.g., 34'],
-    ['Waist (cm)', 'e.g., 26'],
-    ['Hips (cm)', 'e.g.']
+    {label: 'Top', type: 'select', options: withPlaceholder(['XS', 'S', 'M', 'L', 'XL']) },
+    {label: 'Bottom', type: 'select', options: withPlaceholder(['XS', 'S', 'M', 'L', 'XL'])}, 
+    {label: 'Bust(cm)', type: 'slider', min: 80.0, max: 110.0, step: 0.5},
+    {label: 'Waist (cm)', type: 'slider', min: 60.0, max: 90.0, step: 0.5},
+    {label: 'Hips (cm)', type: 'slider', min: 85.0, max: 115.0, step: 0.5},
   ];
-  if (g === 'male') return [
-    ['Shirt', 'S/M/L/XL'],
-    ['Pants', 'e.g., 32x32'],
-    ['Suit Jacket', 'e.g., 40R'],
-    ['Chest (in)', 'e.g., 38'],
-    ['Waist (in)', 'e.g., 32'],
-  ];
-  return [
-    ['Top', 'S/M/L/XL'],
-    ['Bottom', 'S/M/L/XL'],
-    ['Notes', 'anything helpful']
+  else return [
+    {label: 'Top', type: 'select', options: withPlaceholder(['S', 'M', 'L', 'XL', 'XXL']) },
+    {label: 'Bottom', type: 'select', options: withPlaceholder(['S', 'M', 'L', 'XL', 'XXL'])}, 
+    {label: 'Chest(cm)', type: 'slider', min: 80.0, max: 130.0, step: 0.5},
   ];
 }
 
 function renderSizeFields() {
-  const g = sessionStorage.getItem('tribealy::session::gender') || 'other';
-  const pairs = fieldsForGender(g);
+  const g = getGenderFromSession() || (sessionStorage.getItem('tribealy::session::gender') || 'other');
+  const fields = fieldsForGender(g);
   sizeFields.innerHTML = '';
+
   const saved = JSON.parse(localStorage.getItem(sizesStorageKey()) || '{}');
-  pairs.forEach(([label, ph]) => {
-    const input = document.createElement('input');
-    input.placeholder = ph;
-    input.dataset.label = label;
-    input.value = saved[label] || '';
-    sizeFields.appendChild(wrapField(label, input));
+
+  fields.forEach(field => {
+    const wrap = document.createElement('div');
+    wrap.className = 'size-field';
+
+    const lab = document.createElement('label');
+    lab.textContent = field.label;
+    lab.className = 'size-label';
+    wrap.appendChild(lab);
+
+    if (field.type === 'select') {
+      const sel = document.createElement('select');
+      sel.dataset.label = field.label;               // <-- for saving
+      field.options.forEach(opt => {
+        const o = document.createElement('option');
+        o.value = opt;
+        o.textContent = opt || '- Select -';
+        sel.appendChild(o);
+      });
+      if (saved[field.label] != null) sel.value = saved[field.label];
+      wrap.appendChild(sel);
+    } else if (field.type === 'slider') {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+
+      const rng = document.createElement('input');
+      rng.type = 'range';
+      rng.min = field.min;
+      rng.max = field.max;
+      rng.step = field.step || 1;
+      rng.dataset.label = field.label;               // <-- for saving
+      rng.value = (saved[field.label] ?? field.value ?? field.min);
+
+      const val = document.createElement('span');
+      val.className = 'slider-value';
+      val.textContent = rng.value;
+
+      rng.addEventListener('input', () => {
+        val.textContent = rng.value;
+      });
+
+      row.appendChild(rng);
+      row.appendChild(val);
+      wrap.appendChild(row);
+    } else {
+      // Fallback text input (not used now, but safe)
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.dataset.label = field.label;
+      inp.value = saved[field.label] || '';
+      wrap.appendChild(inp);
+    }
+
+    sizeFields.appendChild(wrap);
   });
 }
+
 
 function wrapField(label, inputEl) {
   const wrap = document.createElement('div');
@@ -421,22 +473,7 @@ function wrapField(label, inputEl) {
   return wrap;
 }
 
-sizeGender?.addEventListener('change', renderSizeFields);
-saveSizesBtn.addEventListener('click', (e) => {
-  e.preventDefault();
-  const data = {};
-  sizeFields.querySelectorAll('input').forEach(i => {
-    data[i.dataset.label] = i.value.trim();
-  });
-  data.gender = sessionStorage.getItem('tribealy::session::gender') || 'other';
-  // include bodice picks if any
-  const bodiceSel = Array.from(document.querySelectorAll('#bodicePicker button.selected'))
-    .map(btn => btn.dataset.style);
-  if (bodiceSel.length) data.bodice = bodiceSel;
-  localStorage.setItem(sizesStorageKey(), JSON.stringify(data));
-  sizeMsg.textContent = "Saved! (visible only to host later)";
-  setTimeout(()=> sizeMsg.textContent = '', 1800);
-});
+
 
 
 // ========== FITS: minimal, scoped, reliable ==========
@@ -639,8 +676,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 })();
 
-
-async function getCodenameRow(codenameStr) {
+async function getCodenameRow(codenameStrRaw) {
+  const codenameStr = (codenameStrRaw ?? '').trim();
+  if (!codenameStr) throw new Error('No codename provided');
   // Prefer your existing RPC if it returns id; else fall back to a direct select.
   const rpc = await window.supabase.rpc('lookup_codename', { p_codename: codenameStr });
   if (!rpc.error && rpc.data && rpc.data[0]?.id) return rpc.data[0];
@@ -651,61 +689,87 @@ async function getCodenameRow(codenameStr) {
     .eq('codename', codenameStr)
     .limit(1)
     .maybeSingle();
-  if (error || !data) throw error || new Error('Codename not found');
+  if (error || !data) {throw new Error(`Codename not found: "${codenameStr}"`)}
   return data;
 }
 
 function collectSizesKV() {
   const data = {};
+  // inputs (range/text/number)
   document.querySelectorAll('#sizeFields input').forEach(i => {
-    const key = i.dataset.label || i.previousElementSibling?.textContent || 'Field';
-    data[key] = i.value.trim();
+    const key = i.dataset.key || i.dataset.label || i.name || i.id || i.previousElementSibling?.textContent || 'Field';
+    data[key] = i.type === 'range' ? Number(i.value) : i.value.trim();
+  });
+  // selects
+  document.querySelectorAll('#sizeFields select').forEach(s => {
+    const key = s.dataset.key || s.dataset.label || s.name || s.id || s.previousElementSibling?.textContent || 'Field';
+    data[key] = s.value || null;
   });
   return data;
 }
 
+
+function getSessionCodename() {
+  return (sessionStorage.getItem('tribealy::session::codename')
+       || localStorage.getItem('tribealy::session::codename')
+       || '').trim();
+}
+
 async function saveFitsToBackend() {
-  const cnSession = sessionStorage.getItem('tribealy::session::codename');
-  if (!cnSession && inSession()) {
-    sessionStorage.setItem('tribealy::session::codename', inSession());
-  }
   const sizeMsg = document.getElementById('sizeMsg');
   try {
-    const codenameStr = sessionStorage.getItem('tribealy::session::codename')
-                       || localStorage.getItem('tribealy::session::codename');
-    if (!codenameStr) throw new Error('No codename in session');
+    const codenameStr = getSessionCodename();
+    if (!codenameStr) {
+      sizeMsg.textContent = 'Please log in first (no codename in session).';
+      return;  // Don’t proceed to Supabase
+    }
 
-    const c = await getCodenameRow(codenameStr);   // { id, gender, ... }
+    const c = await getCodenameRow(codenameStr); // throws if not found
+
     const sizes  = collectSizesKV();
     const bodice = Array.from(document.querySelectorAll('#bodicePicker button.selected'))
                     .map(b => b.dataset.style);
 
-    const { error } = await window.supabase
-      .from('fits_sizes')
-      .upsert(
-        {
-          codename_id: c.id,
-          sizes,
-          bodice: bodice.length ? bodice : null,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'codename_id' }
-      );
-
+    const { error } = await supabase.rpc('upsert_fits_sizes', {
+      p_codename: getSessionCodename(),
+      p_sizes: collectSizesKV(),
+      p_bodice: bodice.length ? bodice : null
+    });  
     if (error) throw error;
     sizeMsg.textContent = 'Saved!';
   } catch (e) {
     console.error(e);
-    sizeMsg.textContent = 'Save failed. Check console.';
+    document.getElementById('sizeMsg').textContent = e.message || 'Save failed. Check console.';
   } finally {
-    setTimeout(()=> (sizeMsg.textContent = ''), 1800);
+    setTimeout(()=> (document.getElementById('sizeMsg').textContent = ''), 1800);
   }
 }
 
-document.getElementById('saveSizesBtn')?.addEventListener('click', (e) => {
+const saveBtn = document.getElementById('saveSizesBtn');
+saveBtn?.addEventListener('click', async (e) => {
   e.preventDefault();
-  saveFitsToBackend();
+
+  const sizeMsg = document.getElementById('sizeMsg');
+  const cn = getSessionCodename();
+
+  if (!cn) {
+    // No login/session: save locally so user doesn’t lose data
+    const payload = {
+      ...collectSizesKV(),
+      gender: sessionStorage.getItem('tribealy::session::gender') || 'other',
+      bodice: Array.from(document.querySelectorAll('#bodicePicker button.selected'))
+                .map(b => b.dataset.style)
+    };
+    localStorage.setItem("tribealy::sizes::guest", JSON.stringify(payload));
+    sizeMsg.textContent = 'Saved locally. Log in to sync.';
+    setTimeout(()=> sizeMsg.textContent = '', 1800);
+    return;
+  }
+
+  // Logged in: go to backend
+  await saveFitsToBackend();
 });
+
 
 
 
@@ -817,48 +881,456 @@ unitToggle?.addEventListener('click', () => {
 
 renderSizeFields();
 
-/* ====== Music: 5 suggestions per event, per codename ====== */
-const songInputsWrap = document.getElementById('songInputs');
-const musicEvent = document.getElementById('musicEvent');
-const saveSongsBtn = document.getElementById('saveSongsBtn');
-const songsMsg = document.getElementById('songsMsg');
-const SONGS_KEY = "tribealy::songs::"; // key + codename + event
 
-function songsStorageKey(eventId){
+/*Create a table like music_suggestions(codename_id uuid, payload jsonb, created_at timestamptz 
+default now()) or write an RPC to validate and split into normalized tables.
+
+If you want to update the displayed playlist automatically, keep storing the uri for each track — 
+later your backend can add these to a Spotify playlist via server-side API 
+(requires a different auth flow with your app’s secret; do it server-to-server).
+*/
+/* ======MUSIC===== */
+/* ===== Spotify Integration: PKCE auth + search + picks ===== */
+// ---- Config ----
+const SPOTIFY_CLIENT_ID = (window.SPOTIFY_CLIENT_ID || '').trim();
+const SPOTIFY_SCOPES = ['user-read-email'].join(' '); // search only needs a bearer; no special scopes
+const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname; // same page
+
+// Storage keys
+const SPOTIFY_TOKEN_KEY = 'tribealy::spotify::token';
+const SPOTIFY_CODE_VERIFIER_KEY = 'tribealy::spotify::code_verifier';
+const MUSIC_PICKS_KEY = 'tribealy::musicpicks::'; // per codename
+
+// Events list reused across UI
+const MUSIC_EVENTS = [
+  { value: 'day1',  label: 'Club 25° Games Night' },
+  { value: 'yacht', label: 'Sunkissed & Sailing' },
+  { value: 'mi6',   label: 'MI6: Night Ops' },
+  { value: 'dinner',label: 'TribeAly Table' },
+  { value: 'beach', label: 'Stripes on the Beach' }
+];
+
+function picksKey() {
   const cn = inSession() || 'guest';
-  return `${SONGS_KEY}${cn}::${eventId}`;
+  return MUSIC_PICKS_KEY + cn;
 }
 
-function renderSongInputs() {
-  songInputsWrap.innerHTML = '';
-  const k = songsStorageKey(musicEvent.value);
-  const saved = JSON.parse(localStorage.getItem(k) || '[]');
-  for (let i=0;i<5;i++){
-    const inp = document.createElement('input');
-    inp.type = 'text';
-    inp.placeholder = `Song #${i+1} — artist • title`;
-    inp.value = saved[i] || '';
-    songInputsWrap.appendChild(inp);
-  }
+// ---- PKCE helpers ----
+async function sha256(buf) {
+  const data = new TextEncoder().encode(buf);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(hash)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
-musicEvent.addEventListener('change', renderSongInputs);
+function randStr(len = 64) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, v => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~'[v % 66]).join('');
+}
 
-saveSongsBtn.addEventListener('click', () => {
-  const k = songsStorageKey(musicEvent.value);
-  const vals = Array.from(songInputsWrap.querySelectorAll('input'))
-    .map(i => i.value.trim())
-    .filter(Boolean)
-    .slice(0,5);
-  if (vals.length !== 5){
-    songsMsg.textContent = "Please enter exactly 5 suggestions.";
+// ---- Auth flow (PKCE) ----
+async function startSpotifyAuth() {
+  if (!SPOTIFY_CLIENT_ID) {
+    alert('Set window.SPOTIFY_CLIENT_ID first.');
     return;
   }
-  localStorage.setItem(k, JSON.stringify(vals));
-  songsMsg.textContent = "Saved — nice picks!";
-  setTimeout(()=> songsMsg.textContent='', 1800);
+  const verifier = randStr(64);
+  const challenge = await sha256(verifier);
+  sessionStorage.setItem(SPOTIFY_CODE_VERIFIER_KEY, verifier);
+
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: SPOTIFY_CLIENT_ID,
+    scope: SPOTIFY_SCOPES,
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+    code_challenge_method: 'S256',
+    code_challenge: challenge
+  });
+  window.location.href = `https://accounts.spotify.com/authorize?${params.toString()}`;
+}
+
+async function finishSpotifyAuthIfNeeded() {
+  const url = new URL(window.location.href);
+  const code = url.searchParams.get('code');
+  if (!code) return;
+
+  const verifier = sessionStorage.getItem(SPOTIFY_CODE_VERIFIER_KEY);
+  if (!verifier) return;
+
+  // Exchange code → token (NOTE: This is the only place we call the Accounts API client-side)
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: SPOTIFY_REDIRECT_URI,
+    client_id: SPOTIFY_CLIENT_ID,
+    code_verifier: verifier
+  });
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  });
+
+  if (!res.ok) {
+    console.error('Spotify token exchange failed', await res.text());
+    return;
+  }
+  const tok = await res.json();
+  sessionStorage.removeItem(SPOTIFY_CODE_VERIFIER_KEY);
+  localStorage.setItem(SPOTIFY_TOKEN_KEY, JSON.stringify({ ...tok, ts: Date.now() }));
+  // Clean URL
+  url.searchParams.delete('code'); url.searchParams.delete('state');
+  history.replaceState({}, '', url.toString());
+}
+
+function getSpotifyToken() {
+  try {
+    const raw = localStorage.getItem(SPOTIFY_TOKEN_KEY);
+    if (!raw) return null;
+    const tok = JSON.parse(raw);
+    const age = (Date.now() - (tok.ts || 0)) / 1000;
+    if (tok.expires_in && age > tok.expires_in - 30) return null; // expired
+    return tok.access_token || null;
+  } catch { return null; }
+}
+
+
+
+// ---- API helpers ----
+// Use Supabase Edge Function proxy (no user login required)
+const SPOTIFY_PROXY_URL = "https://ehpezdokajybatjnzdsp.supabase.co/functions/v1/spotify-proxy";
+const DEFAULT_TRACK_LABEL = "TribeAly 25°";
+
+if (vinylTrack) vinylTrack.textContent = DEFAULT_TRACK_LABEL;
+
+async function spSearchTracks(q) {
+  const url = new URL(`${SPOTIFY_PROXY_URL}/search`);
+  url.searchParams.set('q', q);
+  url.searchParams.set('type', 'track');
+  url.searchParams.set('limit', '10');
+
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Spotify proxy search failed.');
+  const data = await r.json();
+  return (data.tracks?.items || []).map(t => ({
+    id: t.id,
+    name: t.name,
+    artists: t.artists.map(a => a.name).join(', '),
+    image: t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || '',
+    uri: t.uri,
+    url: t.external_urls?.spotify,
+    preview: t.preview_url || null
+  }));
+}
+
+
+
+
+// ---- MUSIC UI wiring ----
+document.addEventListener('DOMContentLoaded', async () => {
+  await finishSpotifyAuthIfNeeded();
+
+  // Elements
+  const musicModal = document.getElementById('musicModal');
+  const openMusicModalBtn = document.getElementById('openMusicModalBtn');
+  const spotifyAuthBtn = document.getElementById('spotifyAuthBtn');
+  const spotifyStatus = document.getElementById('spotifyStatus');
+  const spotifyQuery = document.getElementById('spotifyQuery');
+  const spotifySearchBtn = document.getElementById('spotifySearchBtn');
+  const spotifyResults = document.getElementById('spotifyResults');
+  const pickList = document.getElementById('pickList');
+  const submitPicksBtn = document.getElementById('submitPicksBtn');
+  const clearPicksBtn = document.getElementById('clearPicksBtn');
+  const musicSubmitMsg = document.getElementById('musicSubmitMsg');
+
+
+  const vinylTrack = document.getElementById('vinylTrack');
+  const playVinylBtn = document.getElementById('playVinylBtn');
+  const pauseVinylBtn = document.getElementById('pauseVinylBtn');
+  const vinyl = document.getElementById('vinylDisc'); // optional if you spin it
+
+  function startSpin() { vinyl?.classList.add('playing'); }
+  function stopSpin()  { vinyl?.classList.remove('playing'); }
+
+  playVinylBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // <-- prevents flipping
+    vinylTrack?.play().then(startSpin).catch(() => {/* autoplay blocked; user must click */});
+  });
+
+  pauseVinylBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // <-- prevents flipping
+    vinylTrack?.pause();
+    stopSpin();
+  });
+
+  // Optional: auto-play when the card flips to its back
+  // If your card root has an ID, update 'musicCard' below to match it.
+  // Auto-play when the Music card flips to its back face
+  const musicCard = document.querySelector('.card[data-card="music"]');
+  if (musicCard) {
+    const watchFlip = new MutationObserver(() => {
+      const isBack = musicCard.classList.contains('flip'); // 'flip' = back face visible
+      if (isBack) {
+        vinylTrack?.play().then(startSpin).catch(()=>{});
+      } else {
+        vinylTrack?.pause();
+        stopSpin();
+      }
+    });
+    watchFlip.observe(musicCard, { attributes: true, attributeFilter: ['class'] });
+  }
+
+
+
+    function updateAuthStatus() {
+      if (spotifyStatus) spotifyStatus.textContent = 'Powered by Spotify';
+    }
+    updateAuthStatus();
+
+    spotifyAuthBtn?.addEventListener('click', startSpotifyAuth);
+    openMusicModalBtn?.addEventListener('click', () => {
+      document.getElementById('musicModal')?.showModal();
+    });
+
+    //Search
+    let qTimer;
+    async function doSearch() {
+      const q = (spotifyQuery.value || '').trim();
+      if (!q) { spotifyResults.innerHTML = ''; return; }
+      spotifyResults.innerHTML = 'Searching…';
+      try {
+        const items = await spSearchTracks(q);     // uses your Supabase proxy
+        renderResults(items);
+      } catch (e) {
+        spotifyResults.innerHTML = `<div class="muted">Search failed: ${e.message}</div>`;
+      }
+    }
+    spotifyQuery?.addEventListener('input', () => {
+      clearTimeout(qTimer);
+      if ((spotifyQuery.value || '').trim().length < 3) { spotifyResults.innerHTML = ''; return; }
+      qTimer = setTimeout(doSearch, 300);
+    });
+    spotifySearchBtn?.addEventListener('click', doSearch);
+    spotifyQuery?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+    });
+
+    function renderResults(items) {
+      spotifyResults.innerHTML = '';
+      items.forEach(it => {
+        const card = document.createElement('div');
+        card.className = 'track-card';
+        const img = document.createElement('img');
+        img.src = it.image || 'assets/icons/music.png';
+        const meta = document.createElement('div');
+        meta.className = 'track-meta';
+        meta.innerHTML = `<div class="name">${it.name}</div><div class="artists">${it.artists}</div>`;
+
+        const actions = document.createElement('div');
+        actions.className = 'track-actions';
+
+        const sel = document.createElement('select');
+        MUSIC_EVENTS.forEach(ev => {
+          const o = document.createElement('option');
+          o.value = ev.value; o.textContent = ev.label;
+          sel.appendChild(o);
+        });
+
+        const btn = document.createElement('button');
+        btn.className = 'btn'; btn.textContent = 'Add';
+        btn.addEventListener('click', () => addPick(it, sel.value));
+
+        actions.appendChild(sel);
+        actions.appendChild(btn);
+        card.append(img, meta, actions);
+        spotifyResults.appendChild(card);
+      });
+    }
+
+    // --- Picks
+    function picksKey() {
+      const cn = inSession() || 'guest';
+      return MUSIC_PICKS_KEY + cn;
+    }
+    function getPicks() {
+      try { return JSON.parse(localStorage.getItem(picksKey()) || '[]'); } catch { return []; }
+    }
+    function setPicks(arr) { localStorage.setItem(picksKey(), JSON.stringify(arr)); renderPicks(); schedulePicksSync();}
+    function addPick(track, eventVal) {
+      const picks = getPicks();
+      if (picks.length >= 20) { alert('You can only add up to 20 picks.'); return; }
+      if (picks.some(p => p.id === track.id)) return;
+      picks.push({ ...track, event: eventVal });
+      setPicks(picks);
+    }
+    function removePick(id) {
+      setPicks(getPicks().filter(p => p.id !== id));
+    }
+
+    // NEW: allow changing the event beside each saved song
+    function makeEventSelect(current) {
+      const sel = document.createElement('select');
+      MUSIC_EVENTS.forEach(ev => {
+        const o = document.createElement('option');
+        o.value = ev.value; o.textContent = ev.label;
+        sel.appendChild(o);
+      });
+      sel.value = current;
+      return sel;
+    }
+
+    function renderPicks() {
+      const picks = getPicks();
+      pickList.innerHTML = '';
+      picks.forEach(p => {
+        const li = document.createElement('li');
+        li.className = 'pick-item';
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.innerHTML = `
+          <img src="${p.image || 'assets/icons/music.png'}" alt="">
+          <div>
+            <div><strong>${p.name}</strong> — ${p.artists}</div>
+          </div>
+        `;
+
+        const right = document.createElement('div');
+        right.style.display = 'flex';
+        right.style.gap = '8px';
+        right.style.alignItems = 'center';
+
+        const eventSel = makeEventSelect(p.event);
+        eventSel.addEventListener('change', () => {
+          const arr = getPicks();
+          const idx = arr.findIndex(x => x.id === p.id);
+          if (idx >= 0) { arr[idx].event = eventSel.value; setPicks(arr); }
+        });
+
+        const rm = document.createElement('button');
+        rm.className = 'btn ghost small';
+        rm.textContent = 'Remove';
+        rm.addEventListener('click', () => removePick(p.id));
+
+        right.appendChild(eventSel);
+        right.appendChild(rm);
+
+        li.appendChild(meta);
+        li.appendChild(right);
+        pickList.appendChild(li);
+      });
+    }
+    clearPicksBtn?.addEventListener('click', () => setPicks([]));
+    renderPicks();
+    
+
+  // Submit 
+  // --- helper: who can sync?
+function canSyncPicks() {
+  const cn = (inSession() || '').trim();
+  return cn.length > 0;
+}
+
+const pretty = (err) => {
+  if (!err) return '(no error)';
+  // supabase-js error shape: { message, code, details, hint, name }
+  try { return JSON.stringify({
+    message: err.message, code: err.code, details: err.details, hint: err.hint, name: err.name
+  }, null, 2); } catch { return String(err); }
+};
+
+
+// --- shared sync function (throttled)
+let _syncTimer = null;
+
+async function syncPicksToBackend(reason = 'auto') {
+  try {
+    if (!canSyncPicks()) return false;
+
+    const picks = getPicks();
+    const payload = {
+      codename: (inSession() || '').trim().toLowerCase(),
+      picks: picks.map(({id,name,artists,uri,url,preview,image,event}) =>
+        ({id,name,artists,uri,url,preview,image,event})),
+      submitted_at: new Date().toISOString()
+    };
+
+    const { error } = await window.supabase.rpc('upsert_music_picks', {
+      p_codename: payload.codename,
+      p_payload:  payload
+    });
+    if (error) {
+      console.error('[music sync][rpc error]', pretty(error));
+      if(reason === 'submit'){
+        // surface it in the UI briefly
+        musicSubmitMsg.textContent = `Sync error: ${error.message || 'Unknown'}`;
+        setTimeout(()=> musicSubmitMsg.textContent = '', 5000);
+      }
+      return false;
+    }
+    // success
+    if (reason === 'submit') {
+      musicSubmitMsg.textContent = 'Synced!';
+      setTimeout(()=> musicSubmitMsg.textContent = '', 1800);
+    }
+    return true;
+  } catch (e) {
+    console.error('[music sync][exception]', pretty(e));
+    musicSubmitMsg.textContent = `Sync exception: ${e.message || e}`;
+    setTimeout(()=> musicSubmitMsg.textContent = '', 4000);
+    return false;
+  }
+}
+
+// throttle wrapper you can call after every local change
+function schedulePicksSync() {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => { syncPicksToBackend('auto'); }, 600);
+}
+
+ submitPicksBtn?.addEventListener('click', async () => {
+  const picks = getPicks();
+  if (picks.length === 0) { musicSubmitMsg.textContent = 'Add at least one track.'; return; }
+
+  // 1) legacy fan-out (kept as-is)
+  const grouped = picks.reduce((acc, p) => {
+    acc[p.event] = acc[p.event] || [];
+    if (acc[p.event].length < 20) acc[p.event].push(`${p.artists} • ${p.name}`);
+    return acc;
+  }, {});
+  Object.entries(grouped).forEach(([eventId, arr]) => {
+    const k = (function songsStorageKey(eventId){ const cn=inSession()||'guest'; return `tribealy::songs::${cn}::${eventId}`; })(eventId);
+    localStorage.setItem(k, JSON.stringify(arr));
+  });
+
+  // 2) single JSON payload (kept for local cache)
+  const payload = {
+    codename: inSession() || 'guest',
+    picks: picks.map(({id,name,artists,uri,url,preview,image,event}) => ({ id,name,artists,uri,url,preview,image,event })),
+    submitted_at: new Date().toISOString()
+  };
+  localStorage.setItem(picksKey() + '::payload', JSON.stringify(payload));
+
+  // 3) Backend upsert (JSONB) — mirrors Fits save behavior
+  if (!canSyncPicks()) {
+    musicSubmitMsg.textContent = 'Saved locally — log in to sync.';
+    setTimeout(()=> musicSubmitMsg.textContent = '', 2000);
+    return;
+  }
+  const ok = await syncPicksToBackend('submit');
+  musicSubmitMsg.textContent = ok ? 'Submitted!' : 'Saved locally — will retry.';
+  setTimeout(()=> musicSubmitMsg.textContent = '', 1800);
 });
 
-renderSongInputs();
+
+  
+  }
+);
+
+
 
 /* ====== Grocery List: add & vote (per codename, local only) ====== */
 const gItem = document.getElementById('gItem');
@@ -906,56 +1378,145 @@ addGItemBtn.addEventListener('click', ()=>{
 });
 renderGrocery();
 
-/* ====== Calendar: ICS download ====== */
-const downloadIcsBtn = document.getElementById('downloadIcsBtn');
+(() => {
+  // ---- Helpers
+  const tz = "America/New_York";
+  const pad = n => String(n).padStart(2, '0');
+  const fmtDate = (d) => (
+    d.getFullYear() +
+    pad(d.getMonth()+1) +
+    pad(d.getDate())
+  );
+  const fmtTS = (d) => (
+    d.getFullYear() +
+    pad(d.getMonth()+1) +
+    pad(d.getDate()) + 'T' +
+    pad(d.getHours()) +
+    pad(d.getMinutes()) +
+    '00'
+  );
+  const uid = () => (Date.now() + '.' + Math.random().toString(36).slice(2) + '@tribealy');
 
-// Helper to format ICS
-function makeICS(events){
-  const lines = [
-    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//TribeAly//EN'
+  // ---- Dates (assumptions based on your note)
+  const deposit1 = new Date(2025, 10, 20); // Nov 20, 2025 (month is 0-based)
+  const deposit2 = new Date(2025, 11, 10); // Dec 10, 2025
+  const visaTix = new Date(2026, 0, 1);    // Jan 1, 2026
+
+  const day1 = new Date(2026, 2, 13); // Fri, Mar 13 2026
+  const day2 = new Date(2026, 2, 14); // Sat, Mar 14 2026
+  const day3 = new Date(2026, 2, 15); // Sun, Mar 15 2026
+  const day4 = new Date(2026, 2, 16); // Mon, Mar 16 2026
+
+  // ---- Shuttle windows (local times)
+  const makeRange = (baseDate, startH, startM, endH, endM) => ({
+    start: new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), startH, startM),
+    end:   new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), endH, endM),
+  });
+
+  const windows = [
+    { title: "Arrivals Shuttle Window (every 30 min)",   range: makeRange(day1, 14, 0, 15, 0) }, // 2–3 PM
+    { title: "Yacht Day Shuttle Window (every 40 min)",  range: makeRange(day2, 11, 0, 13, 0) }, // 11–1
+    { title: "Beach Day Shuttle Window (every 40 min)",  range: makeRange(day3,  9, 0, 11, 0) }, // 9–11
+    { title: "Departures Shuttle Window (every 60 min)", range: makeRange(day4,  5, 0, 10, 0) }, // 5–10
   ];
-  events.forEach(ev=>{
-    lines.push('BEGIN:VEVENT');
-    lines.push(`UID:${ev.uid}`);
-    lines.push(`DTSTAMP:${ev.dtstamp}`);
-    lines.push(`DTSTART:${ev.dtstart}`);
-    if (ev.dtend) lines.push(`DTEND:${ev.dtend}`);
-    lines.push(`SUMMARY:${ev.summary}`);
-    if (ev.location) lines.push(`LOCATION:${ev.location}`);
-    lines.push('END:VEVENT');
+
+  // ---- Build ICS text
+  function buildICS() {
+    const now = new Date();
+    const dtstamp = fmtTS(now);
+
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//TribeAly//Calendar Export//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH"
+    ];
+
+    // All-day events (VALUE=DATE)
+    const allday = [
+      { summary: "Deposit 1 due", date: deposit1, desc: "First trip deposit is due." },
+      { summary: "Deposit 2 due", date: deposit2, desc: "Second trip deposit is due." },
+      { summary: "Visa & Ticket Reminder", date: visaTix, desc: "Check visa status and purchase tickets if you haven’t yet." },
+    ];
+
+    allday.forEach(ev => {
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:${uid()}`,
+        `DTSTAMP:${dtstamp}`,
+        `DTSTART;VALUE=DATE:${fmtDate(ev.date)}`,
+        `DTEND;VALUE=DATE:${fmtDate(new Date(ev.date.getFullYear(), ev.date.getMonth(), ev.date.getDate()+1))}`,
+        `SUMMARY:${ev.summary}`,
+        `DESCRIPTION:${ev.desc}`,
+        "END:VEVENT"
+      );
+    });
+
+    // Shuttle time windows (with TZID)
+    windows.forEach(w => {
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:${uid()}`,
+        `DTSTAMP:${dtstamp}`,
+        `DTSTART;TZID=${tz}:${fmtTS(w.range.start)}`,
+        `DTEND;TZID=${tz}:${fmtTS(w.range.end)}`,
+        `SUMMARY:${w.title}`,
+        "DESCRIPTION:Shuttles depart repeatedly within this window.",
+        "END:VEVENT"
+      );
+    });
+
+    lines.push("END:VCALENDAR");
+    return lines.join("\r\n");
+  }
+
+  function downloadICS() {
+    const ics = buildICS();
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "TribeAly-Important-Dates.ics";
+    document.body.appendChild(a);
+    a.click();
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }
+
+  function saveAsPDF() {
+    // Open a clean print view with the same content
+    const src = document.getElementById('calendarPrintable');
+    const w = window.open('', '_blank');
+    const styles = `
+      <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; margin: 24px; }
+        h1 { font-size: 20px; margin-bottom: 12px; }
+        ul { list-style: disc; padding-left: 1.25rem; }
+        b { display:block; margin:.25rem 0; }
+        .fine { color:#555; font-size: 12px; margin-top: 16px; }
+      </style>
+    `;
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8">${styles}</head><body>`);
+    w.document.write(`<h1>TribeAly — Important Dates & Times</h1>`);
+    w.document.write(src.innerHTML);
+    w.document.write(`<div class="fine">Generated on ${new Date().toLocaleString()}</div>`);
+    w.document.write(`</body></html>`);
+    w.document.close();
+    w.focus();
+    // Let the new window render, then print (user picks "Save as PDF")
+    w.onload = () => w.print();
+  }
+
+  // Wire up buttons when modal exists
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'downloadIcsBtn') {
+      downloadICS();
+    }
+    if (e.target && e.target.id === 'savePdfBtn') {
+      saveAsPDF();
+    }
   });
-  lines.push('END:VCALENDAR');
-  return lines.join('\r\n');
-}
-
-// Example dates (adjust as needed)
-function pad(n){return String(n).padStart(2,'0');}
-function toIcsDate(y,m,d,hh=0,mm=0){
-  return `${y}${pad(m)}${pad(d)}T${pad(hh)}${pad(mm)}00Z`;
-}
-
-downloadIcsBtn.addEventListener('click', ()=>{
-  // Example: assume trip around Jan 15–18, 2026 UTC placeholders
-  const y=2026;
-  const evs = [
-    {summary:'TribeAly Deposit 1 Due', y, m:11, d:10, hh:17, mm:0},
-    {summary:'TribeAly Deposit 2 Due', y, m:12, d:10, hh:17, mm:0},
-    {summary:'Arrivals Rideshares', y, m:1, d:15, hh:18, mm:0, end:[y,1,15,20,0], location:'Miami Intl (MIA)'},
-    {summary:'Yacht — AT Horizon 25°', y, m:1, d:16, hh:19, mm:0, end:[y,1,16,23,0], location:'Bayside Marina'},
-    {summary:'Chef Dinner — The Era', y, m:1, d:17, hh:23, mm:0, end:[y,1,18,1,0], location:'Villa'}
-  ].map((e,i)=>{
-    const dtstamp = toIcsDate(y,1,1,0,0);
-    const dtstart = toIcsDate(e.y,e.m,e.d,e.hh,e.mm);
-    const dtend = e.end ? toIcsDate(...e.end) : null;
-    return {uid:`tribealy-${i}@example`, dtstamp, dtstart, dtend, summary:e.summary, location:e.location||''}
-  });
-
-  const blob = new Blob([makeICS(evs)], {type:'text/calendar'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'TribeAly.ics';
-  a.click();
-});
+})();
 
 /* ====== Budget: currency & estimates ====== */
 const currencySelect = document.getElementById('currencySelect');
