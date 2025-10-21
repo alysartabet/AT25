@@ -2,70 +2,447 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>#AT25 • Miami</title>
-  <meta name="theme-color" content="#0A0A1B">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TribeAly — 25°ATMIA</title>
+  <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Cormorant+Garamond:ital,wght@1,600;1,700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<!-- PASSWORD GATE -->
-<div class="gate" id="gate" aria-label="Password screen">
-  <div class="sky-sun" aria-hidden="true"></div>
+  <!-- GATE: Codename + First-time Secret Key -->
+  <div id="gate" class="gate">
+    <div class="gate-panel" id="gatePanel">
+      <label class="field">
+        <span>Codename</span>
+        <input id="codenameInput" type="text" placeholder="check your invite text 👀" autocomplete="off" />
+      </label>
 
-  <div class="tagline" id="tagline">
-    <h2>Ready to go MIA with me in Miami? 🦩</h2>
-  </div>
-
-  <div class="wash" id="wash" aria-hidden="true">
-    <div class="wave wave1"></div>
-    <div class="wave wave2"></div>
-    <div class="wave wave3"></div>
-  </div>
-
-  <div class="gate-panel burn-wrap" id="panel">
-    <h1>Enter the magic word</h1>
-    <p class="subtle">Hint: our hashtag energy 🔥</p>
-    <form id="pwform" autocomplete="off">
-      <div class="pin-row">
-        <input id="pw" type="password" inputmode="text" placeholder="Password" aria-label="Password" required />
+      <div id="keyRow" class="field">
+        <span>Secret Key🔑 </span>
+        <input id="keyInput" type="password" placeholder="hint: what hashtags did you see?" />
       </div>
-      <button class="btn" type="submit">Let’s go</button>
-      <div class="msg" id="msg"></div>
+
+      <button id="enterBtn" class="btn primary" type="button">Enter</button>
+      <p id="gateMsg" class="gate-msg" role="alert"></p>
+      <p class="hint">Psst: number of tries might matter 😝 treealy</p>
+    </div>
+  </div>
+
+  <div id="reveal" class="reveal-layer" aria-hidden="true">
+    <div id="revealTitle" class="reveal-title">
+      <p>Welcome to</p>
+      <h1 class="logo" data-text="TribeAly">TribeAly</h1>
+      <p class="tag">Ready to go MIA with me AT 25°?</p>
+    </div>
+  </div>
+
+  
+  <!-- Top bar -->
+  <header id="topbar" class="topbar">
+    <div class="brand">
+      <span class="sunset">☼</span> TribeAly
+      <small class="sub">25° • MIA</small>
+    </div>
+    <div class="session">
+      <span id="helloName"></span>
+      <button id="logoutBtn" class="btn ghost">Log Out</button>
+    </div>
+  </header>
+
+  <!-- Grid of 12 cards -->
+  <main id="main" class="app hidden wrap">
+    <!-- Top 4 small -->
+    <section class="grid">
+      <!-- Location -->
+      <article class="card small" data-card="location">
+        <div class="inner">
+          <div class="face front" style="--icon-w: 220px;"> <!--Small card-->
+            <img class="card-icon" src="assets/icons/location.png" alt="Location">
+          </div>
+          <div class="face back">
+            <h3>Our Villa</h3>
+            <div class="gallery" id="villaGallery">
+              <img src="assets/villa/swimming_pool.png" alt="Villa pool">
+              <img src="assets/villa/living_room.png" alt="Lounge">
+              <img src="assets/villa/bedroom.png" alt="Bedroom">
+            </div>
+            <!-- bottom action row -->
+            <div class="card-actions">
+              <button class="expand-btn" data-open="villaModal" aria-haspopup="dialog">
+                View full details
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Pop-out modal for Location -->
+      <dialog id="villaModal" class="modal">
+        <div class="modal-card">
+          <header class="modal-head">
+            <h4>Villa — Club 25°</h4>
+            <button class="close-modal" aria-label="Close">✕</button>
+          </header>
+
+          <section class="modal-body">
+            <!-- Large gallery -->
+            <div class="grid-gallery">
+              <img src="assets/villa/bed.png" alt="Bed">
+              <img src="assets/villa/living_room.png" alt="Lounge">
+              <img src="assets/villa/dining.png" alt="Dining">
+              <img src="assets/villa/fireplace.png" alt="Fireplace">
+              <img src="assets/villa/bedroom.png" alt="Bedroom">
+              <img src="assets/villa/swimming_pool.png" alt="SwimmingPool">
+            </div>
+
+            <div class="villa-details">
+              <p><strong>Address:</strong> Near South Beach, Miami, FL (TBD after RSVP)</p>
+              <p><strong>Amenities:</strong> Heated pool, 6BR/4BA, Chef-ready kitchen</p>
+              <p><strong>House rules:</strong></p>
+              <ul class="bullets">
+                <li>No glass near the pool</li>
+                <li>Lock doors, close gates</li>
+                <li>Be kind, be inclusive</li>
+              </ul> 
+            </div>
+          </section>
+        </div>
+      </dialog>
+
+      <!-- Suitcase -->
+      <article class="card small" data-card="pack">
+        <div class="inner">
+          <div class="face front" style="--icon-w: 220px;"> <!--Small card-->
+            <img class="card-icon" src="assets/icons/suitcase.png" alt="Suitcase">
+          </div>
+          <div class="face back">
+            <h3>What Should I Pack?</h3>
+            <div class="row gap">
+              <button id="printPackBtn1" class="btn">Save Packing List as PDF</button>
+            </div>
+            <!-- bottom action row -->
+            <div class="card-actions">
+              <button class="expand-btn" data-open="suitcaseModal" aria-haspopup="dialog">
+                View full details
+              </button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Pop-out modal for Suitcase -->
+      <dialog id="suitcaseModal" class="modal">
+        <div class="modal-card">
+          <header class="modal-head">
+            <h4>Pack List</h4>
+            <button class="close-modal" aria-label="Close">✕</button>
+          </header>
+
+          <section class="modal-body">
+            <div class="villa-details">
+              <ul id="packList" class="checklist">
+              <!-- injected -->
+              </ul>
+              <div class="row gap">
+                <button id="printPackBtn" class="btn">Save as PDF</button>
+                <button id="resetPackBtn" class="btn ghost">Reset</button>
+              </div>
+            <small class="note">Note: Checklist saves for this session only and resets on re-login.</small>
+            </div>
+          </section>
+        </div>
+      </dialog>
+
+      <!-- Fits (popout) -->
+      <article class="card small pop" data-open="fitsModal">
+        <div class="inner">
+           <div class="face front" style="--icon-w: 220px;"> <!--Small card-->
+            <img class="card-icon" src="assets/icons/cloth.png" alt="Cloth">
+          </div>
+          <div class="face back center">
+            <p>Tap to open</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- FITS MODAL -->
+      <dialog id="fitsModal" class="modal">
+        <div class="modal-card" data-view="menu">
+          <header class="modal-head">
+            <button type="button" class="icon-btn back-btn hidden" data-back aria-label="Back">←</button>
+            <h4>Fits — Vision & Sizes</h4>
+            <button type="button" class="close-modal" aria-label="Close">✕</button>
+          </header>
+          <section class="modal-body">
+            <div id="fitsMenu">
+              <div class="vision-grid">
+                <button type="button" class="vision-item" data-vision="white">All-White Games Night </button>
+                <button type="button" class="vision-item" data-vision="yacht">Sunkissed & Sailing</button>
+                <button type="button" class="vision-item" data-vision="mi6">MI6: Night Ops</button>
+                <button type="button" class="vision-item" data-vision="dinner">TribeAly Table</button>
+                <button type="button" class="vision-item" data-vision="beach">Stripes on the Beach</button>
+                <button type="button" class="vision-item" data-vision="travel">Comfort Travel</button>
+              </div>
+              <div class="size-header">For TribeAly Traditional Wear, Please Select Your Preferences Below</div>
+              
+              <!-- Bodice picker (auto-shown only for female via JS) -->
+              <div id="bodicePicker" class="bodice-grid hidden" aria-label="Choose bodice styles">
+                <!-- injected images via JS from assets/fits/neckline -->
+              </div>
+
+              <div class="sizes">
+                <div id="sizeFields" class="size-fields"><!-- injected --></div>
+                <button type="button" id="saveSizesBtn" class="btn">Save Sizes</button>
+                <small id="sizeMsg" class="note"></small>
+
+                <div id="sizeGuideWrapper" class="size-guide-wrapper">
+                  <button id="toggleSizeGuide" class="link-btn" type="button">View Size Guide</button>
+
+                  <div id="sizeGuideContent" class="size-guide hidden">
+                    <div class="size-guide-controls">
+                      <button id="unitToggle" class="toggle-btn" type="button">Switch to Inches</button>
+                    </div>
+                    <img id="sizeGuideImg" src="" alt="Size Guide" loading="lazy">
+                  </div>
+              </div>
+            </div>
+          </section>
+          <!-- VIEWER VIEW -->
+          <div id="fitsViewer" class="fits-viewer hidden">
+            <img id="visionImg" alt="Visionboard" />
+          </div>
+        </div>
+      </dialog>
+
+
+      <!-- Music -->
+      <article class="card small" data-card="music">
+        <div class="inner">
+           <div class="face front" style="--icon-w: 220px;"> <!--Small card-->
+            <img class="card-icon" src="assets/icons/music.png" alt="Music">
+          </div>
+          <div class="face back">
+            <h3>Vibes</h3>
+            <div class="player">
+              <!-- Replace with your playlist embed -->
+              <iframe style="border-radius:12px" src="https://open.spotify.com/embed/playlist/37i9dQZF1DX0XUsuxWHRQd" width="100%" height="152" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe>
+            </div>
+            <div class="music-form">
+              <label>Event
+                <select id="musicEvent">
+                  <option value="day1">Club 25° White Party</option>
+                  <option value="yacht">AT Horizon 25° (Yacht)</option>
+                  <option value="mi6">MI6: 25° at Midnight (All black)</option>
+                  <option value="dinner">The Era — Chef Dinner</option>
+                  <option value="beach">South Beach Swim</option>
+                </select>
+              </label>
+              <div id="songInputs" class="songs">
+                <!-- 5 inputs injected -->
+              </div>
+              <button id="saveSongsBtn" class="btn">Save 5 Suggestions</button>
+              <small id="songsMsg" class="note"></small>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Middle 2x2 BIG: Day 1–4 -->
+      <article class="card big" data-card="day1">
+        <div class="inner">
+           <div class="face front" style="--icon-w: 300px;"> <!--Big card-->
+            <span class="card-kicker">DAY 1</span>
+            <img class="card-icon" src="assets/icons/dice.png" alt="Dice">
+          </div>
+          <div class="face back">
+            <div class="vision">Day 1 — Roll in, glow out</div>
+            <ul class="bullets">
+              <li>3:00 PM • Arrival @ Villa (welcome drinks by the pool)</li>
+              <li>4:00 - 6:00 PM • Grocery run</li>
+              <li>8:00 PM • AT Club 25°, White Party Games Night</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <article class="card big" data-card="day2">
+        <div class="inner">
+          <div class="face front" style="--icon-w: 330px;"> <!--Big card-->
+            <span class="card-kicker">DAY 2</span>
+            <img class="card-icon" src="assets/icons/yacht.png" alt="Yacht">
+          </div>
+          <div class="face back">
+            <div class="vision">Day 2 — AT Horizon 25°</div>
+            <ul class="bullets">
+              <li>Optional morning swim</li>
+              <li>Group brunch preparations</li>
+              <li>2:00 - 6:00 PM • Yacht Day</li>
+              <li>11:00 PM • MI6 Club night (25° at Midnight, all black)</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <article class="card big" data-card="day3">
+        <div class="inner">
+         <div class="face front" style="--icon-w: 330px;"> <!--Big card-->
+            <span class="card-kicker">DAY 3</span>
+            <img class="card-icon" src="assets/icons/candles.png" alt="Candles">
+          </div>
+          <div class="face back">
+            <div class="vision">Day 3 — The Era</div>
+            <ul class="bullets">
+              <li>11:00 AM - 3:00 PM • AT South Beach swim &/ tan</li>
+              <li>7:00 PM • Nigerian attire chef-made dinner @ The Era</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <article class="card big" data-card="day4">
+        <div class="inner">
+          <div class="face front" style="--icon-w: 300px;"> <!--Big card-->
+            <span class="card-kicker">DAY 4</span>
+            <img class="card-icon" src="assets/icons/airplane.png" alt="airplane">
+          </div>
+          <div class="face back">
+            <div class="vision">Day 4 — Cool goodbyes</div>
+            <ul class="bullets">
+              <li>10:00 AM • Departure</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <!-- Bottom 4 small -->
+      <article class="card small" data-card="temp">
+        <div class="inner">
+           <div class="face front" style="--icon-w: 220px;"> <!--Small card-->
+            <img class="card-icon" src="assets/icons/thermometer.png" alt="Thermometer">
+          </div>
+          <div class="face back center">
+            <div class="meme">25 degrees, bitches!! 😎🔥</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card small pop" data-open="groceryModal">
+        <div class="inner">
+           <div class="face front" style="--icon-w: 220px;"> <!--Small card-->
+            <img class="card-icon" src="assets/icons/champagne.png" alt="Champagne">
+          </div>
+          <div class="face back center">
+            <p>Tap to open</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card small pop" data-open="calendarModal">
+        <div class="inner">
+           <div class="face front" style="--icon-w: 180px;"> <!--Small card-->
+            <img class="card-icon" src="assets/icons/calendar.png" alt="Calendar">
+          </div>
+          <div class="face back center">
+            <p>Tap to open</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="card small" data-card="budget">
+        <div class="inner">
+           <div class="face front" style="--icon-w: 220px;"> <!--Small card-->
+            <img class="card-icon" src="assets/icons/money.png" alt="Money">
+          </div>
+          <div class="face back">
+            <div class="budget">
+              <div class="row">
+                <label>Currency</label>
+                <select id="currencySelect">
+                  <option value="USD">$ USD</option>
+                  <option value="NGN">₦ NGN</option>
+                  <option value="GBP">£ GBP</option>
+                  <option value="EUR">€ EUR</option>
+                </select>
+              </div>
+              <div id="budgetTable" class="table"></div>
+              <small class="note">Travel not included in base cost. Estimates provided for info only.</small>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- RSVP -->
+    <section class="rsvp">
+      <h2>RSVP</h2>
+      <form id="rsvpForm">
+        <div class="row gap">
+          <input id="rsvpName" type="text" placeholder="Your name" required />
+          <input id="rsvpEmail" type="email" placeholder="Email" required />
+          <label class="checkbox">
+            <input id="rsvpRemind" type="checkbox" />
+            <span>Email me reminders</span>
+          </label>
+        </div>
+        <button class="btn primary">Submit RSVP</button>
+        <small id="rsvpMsg" class="note"></small>
+      </form>
+    </section>
+  </main>
+
+  <!-- GROCERY MODAL -->
+  <dialog id="groceryModal" class="modal">
+    <form method="dialog" class="modal-card">
+      <header>
+        <h3>Grocery List — Add & Vote</h3>
+        <button value="close" class="icon-btn" aria-label="Close">✕</button>
+      </header>
+
+      <div class="row gap">
+        <input id="gItem" type="text" placeholder="Add an item (e.g., sparkling water)" />
+        <button id="addGItemBtn" class="btn" type="button">Add</button>
+      </div>
+
+      <ul id="gList" class="grocery-list"><!-- injected --></ul>
+      <small class="note">Votes help shape shared costs. (Local only for now.)</small>
     </form>
-    <div class="flames" id="flames" aria-hidden="true"></div>
-  </div>
-</div>
+  </dialog>
 
-<!-- MAIN SITE -->
-<div class="site" id="site">
-  <div class="wrap">
-    <header class="main">
-      <div class="hero">
-        <h1>Miami, I’m #AT25 🌴</h1>
-        <p>Villa views, yacht moves, and beach grooves — it’s #AT25. Pack your swimsuits and your best vibes.</p>
-        <div class="tagbar">
-          <span class="tag">#AT25</span><span class="tag">#two🔥</span><span class="tag">#twentyfineashell</span>
-          <span class="tag">Miami, FL</span><span class="tag">[Month ##–##]</span>
-        </div>
-        <div class="cta">
-          <a href="#rsvp" class="btn">RSVP</a>
-          <a href="#itinerary" class="btn ghost">See Itinerary</a>
-          <a href="#costs" class="btn ghost">Costs & Deadlines</a>
-        </div>
+  <!-- CALENDAR MODAL -->
+  <dialog id="calendarModal" class="modal">
+    <form method="dialog" class="modal-card">
+      <header>
+        <h3>Important Dates & Times</h3>
+        <button value="close" class="icon-btn" aria-label="Close">✕</button>
+      </header>
+      <div class="calendar-block">
+        <ul class="bullets">
+          <li>Deposit 1 due: <b>Nov 10</b></li>
+          <li>Deposit 2 due: <b>Dec 10</b></li>
+          <li>Airport rideshares (arrivals): <b>Day 1 • 1 - 3 PM</b></li>
+          <li>Yacht: <b>Day 2 • 2 - 6 PM</b></li>
+          <li>Dinner: <b>Day 3 • 7 PM</b></li>
+        </ul>
+        <button id="downloadIcsBtn" class="btn">Download .ics</button>
+        <small class="note">Add to your calendar (iOS, Google, Outlook).</small>
       </div>
-    </header>
+    </form>
+  </dialog>
 
-    <!-- Sections (Plan, Itinerary, Costs, Travel, Menu, Pack, Rules, RSVP, Footer) -->
-    <!-- Keep the same as in the combined version. I've left them intact for continuity. -->
-    <!-- ... your content continues unchanged ... -->
+  <footer class="footer">
+    <span>© TribeAly • 25°</span>
+  </footer>
 
-    <footer>Made with love for #AT25 — see you in Miami 🌴</footer>
-  </div>
-</div>
-
-<script src="script.js"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script>
+  window.supabase = supabase.createClient(
+    'https://ehpezdokajybatjnzdsp.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVocGV6ZG9rYWp5YmF0am56ZHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3NTc0NzgsImV4cCI6MjA3NDMzMzQ3OH0.SWMGFQk0cPdu-uj59yPUn2Y1GW8MXQIfo0aT8cVUju8'
+  );
+</script>
+  <script src="script.js"></script>
 </body>
 </html>
