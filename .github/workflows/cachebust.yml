@@ -2,7 +2,7 @@ name: Cache-bust GH Pages (all assets)
 
 on:
   push:
-    branches: [ main ]   # change if your Pages branch is different
+    branches: [ main ]   # change if your Pages branch differs
 
 permissions:
   contents: write
@@ -31,13 +31,14 @@ jobs:
       - name: Cache-bust URLs in all HTML files
         shell: bash
         env:
-          BUST_VERSION: ${{ steps.ver.outputs.v }}   # <-- pass env here
+          VERSION: ${{ steps.ver.outputs.v }}   # <-- bake this into the file below
         run: |
-          cat > cachebust.js <<'EOF'
+          # Write the script with VERSION inlined (no env lookup in Node)
+          cat > cachebust.js <<EOF
           const fs = require('fs');
           const path = require('path');
 
-          const VERSION = process.env.BUST_VERSION || String(Date.now());
+          const VERSION = "${VERSION}";
           const exts = /\.(css|js|mjs|png|jpe?g|gif|svg|webp|ico|mp3|wav|ogg|mp4|webm|woff2?|ttf|eot)$/i;
           const SKIP = new Set(['.git', '.github', 'node_modules', 'dist', 'build']);
 
@@ -66,14 +67,14 @@ jobs:
             if (!exts.test(b)) return url;
             if (/\bv=/.test(q)) return url;
             const sep = q ? '&' : '?';
-            return b + (q ? '?' + q : '') + `${sep}v=${VERSION}` + (h ? `#${h}` : '');
+            return b + (q ? '?' + q : '') + \`\${sep}v=\${VERSION}\` + (h ? \`#\${h}\` : '');
           }
 
           function process(file) {
             let src = fs.readFileSync(file, 'utf8');
             const before = src;
             src = src.replace(/\b(href|src)\s*=\s*(['"])([^'"]+)\2/gi,
-              (_, a, q, u) => `${a}=${q}${bust(u)}${q}`);
+              (_, a, q, u) => \`\${a}=\${q}\${bust(u)}\${q}\`);
             if (src !== before) {
               fs.writeFileSync(file, src);
               console.log('busted:', file);
@@ -97,3 +98,4 @@ jobs:
           else
             echo "No changes to commit."
           fi
+
