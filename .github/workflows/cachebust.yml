@@ -4,21 +4,19 @@ on:
   push:
     branches: [ main ]   # change if your Pages branch is different
 
-# allow the workflow to push the HTML changes back
 permissions:
   contents: write
 
 jobs:
   build:
-    # prevent infinite loop when the bot commit triggers another run
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0            # needed for `git rev-parse --short HEAD`
+          fetch-depth: 0
 
-      - uses: actions/setup-node@v4 # ensures `node` is available
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -29,16 +27,16 @@ jobs:
           SHA=$(git rev-parse --short HEAD)
           TS=$(date -u +%Y%m%d%H%M)
           echo "v=$TS-$SHA" >> "$GITHUB_OUTPUT"
+          echo "BUST_VERSION=$TS-$SHA" >> "$GITHUB_ENV"   # <-- export as env var
 
       - name: Cache-bust URLs in all HTML files
         shell: bash
         run: |
-          V="${{ steps.ver.outputs.v }}"
           cat > cachebust.js <<'EOF'
           const fs = require('fs');
           const path = require('path');
 
-          const VERSION = process.argv[2];
+          const VERSION = process.env.BUST_VERSION || 'dev';  // <-- read env var
           const exts = /\.(css|js|mjs|png|jpe?g|gif|svg|webp|ico|mp3|wav|ogg|mp4|webm|woff2?|ttf|eot)$/i;
           const SKIP = new Set(['.git', '.github', 'node_modules', 'dist', 'build']);
 
@@ -52,7 +50,7 @@ jobs:
             return out;
           }
 
-          function ok(url) {
+          function isLocal(url) {
             const u = url.toLowerCase().trim();
             if (u.startsWith('http://') || u.startsWith('https://')) return false;
             if (u.startsWith('//') || u.startsWith('data:')) return false;
@@ -61,7 +59,7 @@ jobs:
           }
 
           function bust(url) {
-            if (!ok(url)) return url;
+            if (!isLocal(url)) return url;
             const [bq, h=''] = url.split('#');
             const [b, q=''] = bq.split('?');
             if (!exts.test(b)) return url;
@@ -83,7 +81,8 @@ jobs:
 
           walk('.').forEach(process);
           EOF
-          node cachebust.js "$V"
+
+          node cachebust.js   # <-- no args needed now
 
       - name: Commit updated HTML (if changed)
         shell: bash
