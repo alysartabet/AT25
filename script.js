@@ -140,7 +140,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       if (row.result === 'WRONG_KEY') {
         const n = row.attempt_count || 1;
-        shakePanel(`Attempt #${n}. Try again :)`);
+        const msg =
+          n >= 11 ? 'Ask the Host!' :
+          n === 8 ? 'This is embarrassing. Ask the host for the key 😊' :
+          (n >= 3 && n <= 5) ? 'Hint: The key is one of the hashtags in the message from your host. Write it without the hashtag sign.' :
+          'Try Again';
+        shakePanel(`Attempt #${n}. ${msg}`);
         return false;
       }
 
@@ -367,6 +372,10 @@ const saveSizesBtn = document.getElementById('saveSizesBtn');
 const sizeMsg = document.getElementById('sizeMsg');
 const SIZES_KEY = "tribealy::sizes::";
 
+saveSizesBtn?.insertAdjacentElement('afterend', sizeMsg);
+const sizeWrap = saveSizesBtn?.parentElement;
+sizeWrap?.classList.add('size-cta');
+
 
 function sizesStorageKey() {
   const cn = inSession() || 'guest';
@@ -495,6 +504,15 @@ document.addEventListener('DOMContentLoaded', () => {
     img:    modal.querySelector('#visionImg'),
     back:   modal.querySelector('[data-back]')
   };
+
+  function resetToMenu() {
+    modal?.setAttribute('data-view', 'menu');
+    card?.setAttribute('data-view', 'menu');
+    el.menu?.classList.remove('hidden');
+    el.viewer?.classList.add('hidden');
+    el.back?.classList.add('hidden');
+  }
+
 
   dbg('init', {
     hasMenu: !!el.menu,
@@ -640,12 +658,50 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+// --- FITS: when the dialog opens/closes, always land on MENU (with back hidden)
+(function wireFitsOpenObserver(){
+  const modal = document.getElementById('fitsModal');
+  if (!modal) return;
+
+  // local, scoped reset that doesn't rely on other blocks
+  function forceMenuState() {
+    modal.setAttribute('data-view', 'menu');
+    modal.querySelector('#fitsMenu')?.classList.remove('hidden');
+    modal.querySelector('#fitsViewer')?.classList.add('hidden');
+    modal.querySelector('[data-back]')?.classList.add('hidden');
+  }
+
+  function onOpen() {
+    forceMenuState();                 // ensure clean start every time
+    renderSizeFields();               // (re)build size inputs
+    renderBodiceIfFemale();           // show bodice grid only for female
+  }
+
+  // Show: mutation observer fires when <dialog open> flips true
+  const obs = new MutationObserver(() => { if (modal.open) onOpen(); });
+  obs.observe(modal, { attributes: true, attributeFilter: ['open'] });
+
+  // Also pre-reset before any explicit opener shows it
+  document.querySelectorAll('[data-open="fitsModal"]').forEach(opener => {
+    opener.addEventListener('click', () => {
+      forceMenuState();
+      // showModal is called by the generic [data-open] handler elsewhere
+    });
+  });
+
+  // Close: truly put it back to menu (hide viewer AND back)
+  modal.addEventListener('close', forceMenuState);
+})();
+
+
 // --- FITS: when the dialog opens, render gender-specific UI ---
+/*
 (function wireFitsOpenObserver(){
   const modal = document.getElementById('fitsModal');
   if (!modal) return;
 
   function onOpen() {
+    resetToMenu();
     // ensure we start on the menu
     modal.setAttribute('data-view', 'menu');
     // build size inputs for the current user's gender
@@ -663,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Also catch explicit openers (in case a browser doesn't toggle 'open' fast enough)
   document.querySelectorAll('[data-open="fitsModal"]').forEach(opener => {
     opener.addEventListener('click', () => {
+      resetToMenu();
       // run right after showModal()
       setTimeout(onOpen, 0);
     });
@@ -675,6 +732,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (backBtn) backBtn.classList.add('hidden');
   });
 })();
+*/
 
 async function getCodenameRow(codenameStrRaw) {
   const codenameStr = (codenameStrRaw ?? '').trim();
@@ -1066,6 +1124,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     stopSpin();
   });
 
+  // place the small message right under the Submit button 
+  submitPicksBtn?.insertAdjacentElement('afterend', musicSubmitMsg);
+
+
   // Optional: auto-play when the card flips to its back
   // If your card root has an ID, update 'musicCard' below to match it.
   // Auto-play when the Music card flips to its back face
@@ -1120,6 +1182,74 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderResults(items) {
       spotifyResults.innerHTML = '';
+
+      const already = new Set(getPicks().map(p => p.id));
+
+      items.forEach(it => {
+        const card = document.createElement('div');
+        card.className = 'track-card';
+
+        const img = document.createElement('img');
+        img.src = it.image || 'assets/icons/music.png';
+
+        const meta = document.createElement('div');
+        meta.className = 'track-meta';
+        meta.innerHTML = `<div class="name">${it.name}</div><div class="artists">${it.artists}</div>`;
+
+        const actions = document.createElement('div');
+        actions.className = 'track-actions';
+
+        // --- Event select with placeholder
+        const sel = document.createElement('select');
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '---Select Event---';
+        sel.appendChild(placeholder);
+
+        MUSIC_EVENTS.forEach(ev => {
+          const o = document.createElement('option');
+          o.value = ev.value; 
+          o.textContent = ev.label;
+          sel.appendChild(o);
+        });
+        sel.value = '';
+
+        // --- Add button
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = already.has(it.id) ? 'Added' : 'Add';
+        btn.disabled = already.has(it.id);
+
+        // live guard: prevent add until event chosen
+        sel.addEventListener('change', () => {
+          sel.classList.remove('invalid');
+          if (!already.has(it.id)) btn.disabled = !sel.value;
+        });
+
+        btn.addEventListener('click', () => {
+          if (!sel.value) {
+            sel.classList.add('invalid');
+            sel.focus();
+            return;
+          }
+          const added = addPick(it, sel.value);
+          if (added) {
+            btn.textContent = 'Added';
+            btn.disabled = true;
+          }
+        });
+
+        actions.appendChild(sel);
+        actions.appendChild(btn);
+        card.append(img, meta, actions);
+        spotifyResults.appendChild(card);
+      });
+    }
+
+
+    /*
+    function renderResults(items) {
+      spotifyResults.innerHTML = '';
       items.forEach(it => {
         const card = document.createElement('div');
         card.className = 'track-card';
@@ -1149,6 +1279,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         spotifyResults.appendChild(card);
       });
     }
+    */
 
     // --- Picks
     function picksKey() {
@@ -1159,6 +1290,18 @@ document.addEventListener('DOMContentLoaded', async () => {
       try { return JSON.parse(localStorage.getItem(picksKey()) || '[]'); } catch { return []; }
     }
     function setPicks(arr) { localStorage.setItem(picksKey(), JSON.stringify(arr)); renderPicks(); schedulePicksSync();}
+
+    function addPick(track, eventVal) {
+      if (!eventVal) return false; // must pick an event first
+      const picks = getPicks();
+      if (picks.length >= 20) { alert('You can only add up to 20 picks.'); return false; }
+      if (picks.some(p => p.id === track.id)) return false;
+      picks.push({ ...track, event: eventVal });
+      setPicks(picks);
+      return true;
+    }
+
+    /*
     function addPick(track, eventVal) {
       const picks = getPicks();
       if (picks.length >= 20) { alert('You can only add up to 20 picks.'); return; }
@@ -1166,6 +1309,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       picks.push({ ...track, event: eventVal });
       setPicks(picks);
     }
+    */
+
     function removePick(id) {
       setPicks(getPicks().filter(p => p.id !== id));
     }
@@ -1779,9 +1924,382 @@ attendeeCount?.addEventListener('input', renderBudgetModal);
   obs.observe(dlg, { attributes:true, attributeFilter:['open'] });
 })();
 
+/* ====== RSVP (cannot-attend flow + RPC) — DEBUG INSTRUMENTED ====== */
+const DEBUG_RSVP = true;
+const L = (...a) => DEBUG_RSVP && console.log('[rsvp]', ...a);
+const G = (label) => DEBUG_RSVP && console.group(`[rsvp] ${label}`);
+const GE = () => DEBUG_RSVP && console.groupEnd();
+
+window.addEventListener('error', (e)=> console.error('[rsvp][window error]', e));
+window.addEventListener('unhandledrejection', (e)=> console.error('[rsvp][unhandled]', e.reason));
+
+const rsvpForm       = document.getElementById('rsvpForm');
+const rsvpMsg        = document.getElementById('rsvpMsg');
+const rsvpScreen     = document.getElementById('rsvpScreen') || rsvpForm?.closest('.rsvp');
+const rsvpSubmitBtn  = document.getElementById('rsvpSubmitBtn');
+const rsvpNoBtn      = document.getElementById('rsvpNoBtn');
+const rsvpCannotChk  = document.getElementById('rsvpCannot');
+const rsvpBlurb      = document.getElementById('rsvpBlurb');
+const RSVP_KEY       = "tribealy::rsvp::";
+
+function rsvpKey(){ return RSVP_KEY + (inSession?.() || 'guest'); }
+
+(function sanityCheck() {
+  G('sanity');
+  const wiring = {
+    rsvpForm: !!rsvpForm,
+    rsvpMsg: !!rsvpMsg,
+    rsvpScreen: !!rsvpScreen,
+    rsvpSubmitBtn: !!rsvpSubmitBtn,
+    rsvpNoBtn: !!rsvpNoBtn,
+    rsvpCannotChk: !!rsvpCannotChk,
+    supabase_present: typeof supabase !== 'undefined',
+    rpc_available_hint: 'submit_rsvp (server function)'
+  };
+  console.table(wiring);
+  if (!wiring.supabase_present) console.error('[rsvp] Supabase client is NOT on window.');
+  GE();
+})();
+
+(function autofillRSVPName(){
+  const nameEl = document.getElementById('rsvpName');
+  if (!nameEl) return;
+  const fn = (sessionStorage.getItem('tribealy::session::first_name') || '').trim();
+  const ln = (sessionStorage.getItem('tribealy::session::last_name')  || '').trim();
+  const nn = (sessionStorage.getItem('tribealy::session::nickname')   || '').trim();
+  if (fn || ln) {
+    const nickPart = nn && nn.toLowerCase() !== fn.toLowerCase() ? ` (${nn})` : '';
+    nameEl.value = `${fn || ''}${nickPart}${ln ? ` ${ln}` : ''}`.trim();
+  }
+})();
+
+function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+// Toggle UI for cannot-attend
+function applyCannotState(on) {
+  G('toggle cannot-attend');
+  L('state ->', on);
+  rsvpScreen?.classList.toggle('greyed', on);
+  rsvpSubmitBtn?.classList.toggle('hidden', on);
+  rsvpNoBtn?.classList.toggle('hidden', !on);
+
+  // Make inputs inert when greyed (except the checkbox + red button)
+  if (rsvpForm) {
+    [...rsvpForm.elements].forEach(el => {
+      if (el === rsvpCannotChk || el === rsvpNoBtn) return;
+      el.disabled = on;
+    });
+  }
+
+  // Email not required if cannot attend
+  const emailEl = document.getElementById('rsvpEmail');
+  if (emailEl) {
+    if (on) {
+      emailEl.removeAttribute('required');
+      rsvpBlurb.textContent = 'We’ll record that you can’t make it. Sad to miss you!';
+    } else {
+      emailEl.setAttribute('required', 'required');
+      rsvpBlurb.textContent = 'by submitting you agree to be emailed with reminders about the trip (no spam, I promise)';
+    }
+  }
+
+  // Visual z-index sanity
+  if (on) {
+    const dangerStyles = getComputedStyle(rsvpNoBtn);
+    L('danger button computed:', {
+      zIndex: dangerStyles.zIndex,
+      position: dangerStyles.position,
+      display: dangerStyles.display
+    });
+  }
+  GE();
+}
+rsvpCannotChk?.addEventListener('change', () => applyCannotState(rsvpCannotChk.checked));
+
+// RPC wrapper with strong logging
+async function submitRsvpRPC({ trip_id, codename, name, email, cannot_attend, notes }) {
+  G('rpc submit_rsvp');
+  if (typeof supabase === 'undefined') {
+    console.error('[rsvp] supabase missing on window');
+    throw new Error('Supabase client not found');
+  }
+
+  const t0 = performance.now();
+  let user = null;
+  try {
+    const userRes = await supabase.auth.getUser();
+    user = userRes?.data?.user || null;
+  } catch (e) {
+    console.warn('[rsvp] getUser failed:', e?.message || e);
+  }
+  L('auth user:', user ? { id: user.id, email: user.email } : null);
+
+  const payload = {
+    p_trip_id: trip_id,
+    p_codename: codename || null,
+    p_name: name || null,
+    p_email: email || null,
+    p_cannot_attend: !!cannot_attend,
+    p_notes: notes || null
+  };
+  console.table(payload);
+
+  let data, error;
+  try {
+    const res = await supabase.rpc('submit_rsvp', payload);
+    data = res.data; error = res.error;
+  } catch (err) {
+    error = err;
+  }
+
+  const dt = (performance.now() - t0).toFixed(1) + 'ms';
+  if (error) {
+    console.error('[rsvp][rpc error]', { message: error.message, code: error.code, details: error.details, hint: error.hint, dt });
+    GE();
+    throw error;
+  }
+  L('rpc OK in', dt, 'returned:', data);
+  GE();
+  return data;
+}
+
+// Normal “attending” submit
+rsvpForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  G('submit (attending)');
+  rsvpMsg.textContent = '';
+
+  const nameEl  = document.getElementById('rsvpName');
+  const emailEl = document.getElementById('rsvpEmail');
+  const notesEl = document.getElementById('rsvpNotes');
+
+  const name   = (nameEl?.value  || '').trim();
+  const email  = (emailEl?.value || '').trim();
+  const notes  = (notesEl?.value || '').trim();
+
+  L('pre-validate', { name, email_ok: isValidEmail(email) });
+  if (!email) { rsvpMsg.textContent = 'Email is required.'; emailEl?.focus(); GE(); return; }
+  if (!isValidEmail(email)) { rsvpMsg.textContent = 'Please enter a valid email.'; emailEl?.focus(); GE(); return; }
+
+  // local cache
+  try {
+    const entry = { name, email, cannot_attend:false, notes, ts: Date.now() };
+    const arr = JSON.parse(localStorage.getItem(rsvpKey()) || '[]');
+    arr.push(entry);
+    localStorage.setItem(rsvpKey(), JSON.stringify(arr));
+    L('cached locally (attending)', entry);
+  } catch (eCache) {
+    console.warn('[rsvp] local cache failed:', eCache);
+  }
+
+  try {
+    const data = await submitRsvpRPC({
+      trip_id: 'miami-2026',
+      codename: inSession?.() || null,
+      name, email, cannot_attend:false, notes
+    });
+    L('server response (attending):', data);
+    rsvpMsg.textContent = 'RSVP received — see you at 25°! 🎉';
+    rsvpForm.reset();
+    applyCannotState(false); // reset UI
+  } catch (e2) {
+    console.warn('[rsvp] submit failed; network/RPC issue?', e2?.message || e2);
+    rsvpMsg.textContent = 'Saved locally — will sync later.';
+  } finally {
+    setTimeout(()=> rsvpMsg.textContent = '', 2600);
+    GE();
+  }
+});
+
+// Destructive confirm (cannot attend)
+rsvpNoBtn?.addEventListener('click', async () => {
+  G('confirm cannot-attend');
+  rsvpNoBtn.disabled = true;
+
+  const name  = (document.getElementById('rsvpName')?.value  || '').trim();
+  const email = (document.getElementById('rsvpEmail')?.value || '').trim(); // optional here
+  const notes = (document.getElementById('rsvpNotes')?.value || '').trim();
+
+  L('payload', { name, email_or_null: email || null, notes });
+
+  // local cache
+  try {
+    const entry = { name, email: email || null, cannot_attend:true, notes, ts: Date.now() };
+    const arr = JSON.parse(localStorage.getItem(rsvpKey()) || '[]');
+    arr.push(entry);
+    localStorage.setItem(rsvpKey(), JSON.stringify(arr));
+    L('cached locally (cannot_attend)', entry);
+  } catch (eCache) {
+    console.warn('[rsvp] local cache failed:', eCache);
+  }
+
+  try {
+    const data = await submitRsvpRPC({
+      trip_id: 'miami-2026',
+      codename: inSession?.() || null,
+      name, email: email || null, cannot_attend:true, notes
+    });
+    L('server response (cannot_attend):', data);
+    rsvpMsg.textContent = 'Recorded — you cannot attend.';
+    // log them out to the gate
+    try {
+      const so = await supabase.auth.signOut();
+      L('signed out:', so);
+    } catch (eSign) {
+      console.warn('[rsvp] signOut issue:', eSign?.message || eSign);
+    }
+    sessionStorage.removeItem?.(SESSION_CODE);
+    setTimeout(() => { window.location.href = "/"; }, 600);
+  } catch (e) {
+    console.error('[rsvp] cannot-attend failed:', e?.message || e);
+    rsvpMsg.textContent = 'Couldn’t record right now. Try again.';
+    rsvpNoBtn.disabled = false;
+  } finally {
+    setTimeout(()=> rsvpMsg.textContent = '', 2600);
+    GE();
+  }
+});
+
+/* ====== RSVP (cannot-attend flow + RPC) ====== */
+/*
+const rsvpForm       = document.getElementById('rsvpForm');
+const rsvpMsg        = document.getElementById('rsvpMsg');
+const rsvpScreen     = document.getElementById('rsvpScreen');
+const rsvpSubmitBtn  = document.getElementById('rsvpSubmitBtn');
+const rsvpNoBtn      = document.getElementById('rsvpNoBtn');
+const rsvpCannotChk  = document.getElementById('rsvpCannot');
+const rsvpBlurb      = document.getElementById('rsvpBlurb');
+const RSVP_KEY       = "tribealy::rsvp::";
+function rsvpKey(){ return RSVP_KEY + (inSession() || 'guest'); }
+
+(function autofillRSVPName(){
+  const nameEl = document.getElementById('rsvpName');
+  if (!nameEl) return;
+  const fn = (sessionStorage.getItem('tribealy::session::first_name') || '').trim();
+  const ln = (sessionStorage.getItem('tribealy::session::last_name')  || '').trim();
+  const nn = (sessionStorage.getItem('tribealy::session::nickname')   || '').trim();
+  if (fn || ln) {
+    const nickPart = nn && nn.toLowerCase() !== fn.toLowerCase() ? ` (${nn})` : '';
+    nameEl.value = `${fn || ''}${nickPart}${ln ? ` ${ln}` : ''}`.trim();
+  }
+})();
+
+function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
+
+// Toggle UI for cannot-attend
+function applyCannotState(on) {
+  rsvpScreen.classList.toggle('greyed', on);
+  rsvpSubmitBtn.classList.toggle('hidden', on);
+  rsvpNoBtn.classList.toggle('hidden', !on);
+
+  // Make inputs inert when greyed (except the checkbox + red button)
+  [...rsvpForm.elements].forEach(el => {
+    if (el === rsvpCannotChk || el === rsvpNoBtn) return;
+    el.disabled = on;
+  });
+
+  // Email not required if cannot attend
+  const emailEl = document.getElementById('rsvpEmail');
+  if (on) {
+    emailEl.removeAttribute('required');
+    rsvpBlurb.textContent = 'We’ll record that you can’t make it. Sad to miss you!';
+  } else {
+    emailEl.setAttribute('required', 'required');
+    rsvpBlurb.textContent = 'by submitting you agree to be emailed with reminders about the trip (no spam, I promise)';
+  }
+}
+rsvpCannotChk?.addEventListener('change', () => applyCannotState(rsvpCannotChk.checked));
+
+// Send via SECURITY DEFINER RPC (server captures IP; upserts per (trip,user/email))
+async function submitRsvpRPC({ trip_id, codename, name, email, cannot_attend, notes }) {
+  const { data: user } = await supabase.auth.getUser();
+  const { data, error } = await supabase.rpc('submit_rsvp', {
+    p_trip_id: trip_id,
+    p_codename: codename || null,
+    p_name: name || null,
+    p_email: email || null,
+    p_cannot_attend: !!cannot_attend,
+    p_notes: notes || null
+  });
+  if (error) throw error;
+  return data;
+}
+
+// Normal “attending” submit
+rsvpForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const nameEl  = document.getElementById('rsvpName');
+  const emailEl = document.getElementById('rsvpEmail');
+  const notesEl = document.getElementById('rsvpNotes');
+
+  const name   = (nameEl.value  || '').trim();
+  const email  = (emailEl.value || '').trim();
+  const notes  = (notesEl?.value || '').trim();
+
+  if (!email) { rsvpMsg.textContent = 'Email is required.'; emailEl.focus(); return; }
+  if (!isValidEmail(email)) { rsvpMsg.textContent = 'Please enter a valid email.'; emailEl.focus(); return; }
+
+  // local cache (nice-to-have)
+  const entry = { name, email, cannot_attend:false, notes, ts: Date.now() };
+  const arr = JSON.parse(localStorage.getItem(rsvpKey()) || '[]');
+  arr.push(entry);
+  localStorage.setItem(rsvpKey(), JSON.stringify(arr));
+
+  try {
+    await submitRsvpRPC({
+      trip_id: 'bahamas-2026',
+      codename: inSession() || null,
+      name, email, cannot_attend:false, notes
+    });
+    rsvpMsg.textContent = 'RSVP received — see you at 25°! 🎉';
+    rsvpForm.reset();
+  } catch (e2) {
+    console.warn('[rsvp] submit failed:', e2?.message || e2);
+    rsvpMsg.textContent = 'Saved locally — will sync later.';
+  } finally {
+    setTimeout(()=> rsvpMsg.textContent = '', 2600);
+  }
+});
+
+// Destructive confirm
+rsvpNoBtn?.addEventListener('click', async () => {
+  rsvpNoBtn.disabled = true;
+  try {
+    const name  = (document.getElementById('rsvpName').value  || '').trim();
+    const email = (document.getElementById('rsvpEmail').value || '').trim(); // optional in this path
+    const notes = (document.getElementById('rsvpNotes').value || '').trim();
+
+    // local cache
+    const entry = { name, email: email || null, cannot_attend:true, notes, ts: Date.now() };
+    const arr = JSON.parse(localStorage.getItem(rsvpKey()) || '[]');
+    arr.push(entry);
+    localStorage.setItem(rsvpKey(), JSON.stringify(arr));
+
+    await submitRsvpRPC({
+      trip_id: 'bahamas-2026',
+      codename: inSession() || null,
+      name, email: email || null, cannot_attend:true, notes
+    });
+
+    rsvpMsg.textContent = 'Recorded — you cannot attend.';
+    // log them out to the gate
+    await supabase.auth.signOut().catch(()=>{});
+    sessionStorage.removeItem(SESSION_CODE);
+    // visual bounce
+    setTimeout(() => { window.location.href = "/"; }, 600);
+  } catch (e) {
+    console.error('[rsvp] cannot-attend failed:', e?.message || e);
+    rsvpMsg.textContent = 'Couldn’t record right now. Try again.';
+    rsvpNoBtn.disabled = false;
+    setTimeout(()=> rsvpMsg.textContent = '', 2600);
+  }
+});
+*/
 
 /* ====== RSVP ====== */
 /* ====== RSVP (autofill + validation + backend) ====== */
+/*
 const rsvpForm = document.getElementById('rsvpForm');
 const rsvpMsg  = document.getElementById('rsvpMsg');
 const RSVP_KEY = "tribealy::rsvp::";
@@ -1863,6 +2381,7 @@ rsvpForm.addEventListener('submit', async (e)=>{
   rsvpForm.reset();
   setTimeout(()=> rsvpMsg.textContent = '', 2600);
 });
+*/
 
 
 /* ====== Small QoL: Close modals on backdrop click ====== */

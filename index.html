@@ -548,7 +548,7 @@
 
 
       <!-- RSVP -->
-      <section class="rsvp">
+      <section class="rsvp" id="rsvpScreen">
       <h2>RSVP</h2>
       <form id="rsvpForm" novalidate>
         <div class="row gap" style="align-items:flex-end">
@@ -563,8 +563,8 @@
           </div>
 
           <label class="checkbox" style="margin-top:4px">
-            <input id="rsvpRemind" type="checkbox" />
-            <span>Email me reminders</span>
+            <input id="rsvpCannot" type="checkbox" />
+            <span>I cannot attend</span>
           </label>
         </div>
 
@@ -573,9 +573,10 @@
         </div>
 
         <div class="row gap" style="margin-top:10px">
-          <button class="btn primary" type="submit">Submit RSVP</button>
+          <button class="btn primary" id="rsvpSubmitBtn" type="submit">Submit RSVP</button>
+          <button class="btn danger hidden" id="rsvpNoBtn" type="button">I’m Sure</button>
         </div>
-        <small class="note" style="display:block; margin-top:-13px">
+        <small class="note" id="rsvpBlurb" style="display:block; margin-top:-13px">
               by submitting you agree to be emailed with reminders about the trip (no spam, I promise)
             </small>
 
