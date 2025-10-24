@@ -1,0 +1,102 @@
+name: Cache-bust GH Pages (all assets)
+
+on:
+  push:
+    branches: [ main ]   # change if your Pages branch is different
+
+jobs:
+  build:
+    # prevent infinite loop when this job commits back to the same branch
+    if: github.actor != 'github-actions'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate version string
+        id: ver
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          TS=$(date -u +%Y%m%d%H%M)
+          echo "v=$TS-$SHA" >> $GITHUB_OUTPUT
+
+      - name: Cache-bust URLs in all HTML files
+        run: |
+          V="${{ steps.ver.outputs.v }}"
+          cat > cachebust.js <<'EOF'
+          const fs = require('fs');
+          const path = require('path');
+
+          const VERSION = process.argv[2];
+          const exts = /\.(css|js|mjs|png|jpg|jpeg|gif|svg|webp|ico|mp3|wav|ogg|mp4|webm|woff2?|ttf|eot)$/i;
+          const SKIP_DIRS = new Set(['.git', '.github', 'node_modules', 'dist', 'build']);
+
+          function walk(dir, files=[]) {
+            for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+              if (SKIP_DIRS.has(ent.name)) continue;
+              const p = path.join(dir, ent.name);
+              if (ent.isDirectory()) walk(p, files);
+              else if (p.endsWith('.html')) files.push(p);
+            }
+            return files;
+          }
+
+          function bustUrl(url) {
+            // ignore external, protocol-relative, data, anchors, mailto, tel
+            const lower = url.toLowerCase().trim();
+            if (
+              lower.startsWith('http://') || lower.startsWith('https://') ||
+              lower.startsWith('//') || lower.startsWith('data:') ||
+              lower.startsWith('#') || lower.startsWith('mailto:') ||
+              lower.startsWith('tel:')
+            ) return url;
+
+            // split query/hash
+            const [basePlusQuery, hash=''] = url.split('#');
+            const [base, query=''] = basePlusQuery.split('?');
+
+            // only bust known asset extensions
+            if (!exts.test(base)) return url;
+
+            // if already has v= in query, leave it
+            if (/\bv=/.test(query)) return url;
+
+            const sep = query ? '&' : '?';
+            const newUrl = base + (query ? '?' + query : '') + `${sep}v=${VERSION}` + (hash ? `#${hash}` : '');
+            return newUrl;
+          }
+
+          function processHtml(file) {
+            let src = fs.readFileSync(file, 'utf8');
+            const before = src;
+
+            // Replace in href/src attributes (single or double quotes)
+            src = src.replace(
+              /\b(href|src)\s*=\s*(['"])([^'"]+)\2/gi,
+              (m, attr, q, url) => `${attr}=${q}${bustUrl(url)}${q}`
+            );
+
+            if (src !== before) {
+              fs.writeFileSync(file, src, 'utf8');
+              console.log('busted:', file);
+              return true;
+            }
+            return false;
+          }
+
+          const changed = walk('.').map(processHtml).some(Boolean);
+          if (!changed) console.log('No HTML asset URLs needed cache-busting.');
+          EOF
+
+          node cachebust.js "$V"
+
+      - name: Commit updated HTML (if changed)
+        run: |
+          if ! git diff --quiet -- '*.html'; then
+            git config user.name "github-actions"
+            git config user.email "actions@users.noreply.github.com"
+            git add '*.html'
+            git commit -m "chore: cache-bust assets v=${{ steps.ver.outputs.v }}"
+            git push
+          else
+            echo "No changes to commit."
+          fi
