@@ -2319,6 +2319,8 @@ function rsvpKey(){ return RSVP_KEY + (inSession() || 'guest'); }
   }
 })();
 
+:triggering page deploy IGNORE IGNORE REMOVE IGNORE
+
 function isValidEmail(e){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
 
 async function sendRSVPToBackend(entry){
