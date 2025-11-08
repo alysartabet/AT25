@@ -28,7 +28,7 @@
 
       <button id="enterBtn" class="btn primary" type="button">Enter</button>
       <p id="gateMsg" class="gate-msg" role="alert"></p>
-      <p class="hint">Psst: number of tries might matter 😝(test change)</p>
+      <p class="hint">Psst: number of tries might matter 😝</p>
     </div>
   </div>
 
@@ -68,7 +68,7 @@
             <div class="gallery" id="villaGallery">
               <img src="assets/villa/swimming_pool.png?v=202510240500-f90f1a1" alt="Villa pool">
               <img src="assets/villa/living_room.png?v=202510240500-f90f1a1" alt="Lounge">
-              <img src="assets/villa/bedroom.png?v=202510240500-f90f1a1" alt="Bedroom">
+              <img src="assets/villa/bed.png?v=202510240500-f90f1a1" alt="Bedroom">
             </div>
             <!-- bottom action row -->
             <div class="card-actions">
@@ -91,17 +91,17 @@
           <section class="modal-body">
             <!-- Large gallery -->
             <div class="grid-gallery">
-              <img src="assets/villa/bed.png?v=202510240500-f90f1a1" alt="Bed">
+              <img src="assets/villa/bedroom.png?v=202510240500-f90f1a1" alt="Bed">
               <img src="assets/villa/living_room.png?v=202510240500-f90f1a1" alt="Lounge">
               <img src="assets/villa/dining.png?v=202510240500-f90f1a1" alt="Dining">
-              <img src="assets/villa/fireplace.png?v=202510240500-f90f1a1" alt="Fireplace">
-              <img src="assets/villa/bedroom.png?v=202510240500-f90f1a1" alt="Bedroom">
+              <img src="assets/villa/outside.png?v=202510240500-f90f1a1" alt="Fireplace">
+              <img src="assets/villa/pool_table.png?v=202510240500-f90f1a1" alt="Bedroom">
               <img src="assets/villa/swimming_pool.png?v=202510240500-f90f1a1" alt="SwimmingPool">
             </div>
 
             <div class="villa-details">
-              <p><strong>Address:</strong> Near South Beach, Miami, FL (TBD after RSVP)</p>
-              <p><strong>Amenities:</strong> Heated pool, 6BR/4BA, Chef-ready kitchen</p>
+              <p><strong>Address:</strong>  801 NE 88th St, Miami, FL 33138 (closest location on Airbnb - for privacy reasons, actual location unavailable until booked)</p>
+              <p><strong>Amenities:</strong> Heated pool, 6BR/4BA (8 beds), Chef-ready kitchen, BBQ Grill, Pool Table, Basketball Hoop, Mini Beach Volleyball Court, Hair dryer, Washer/Dryer, Iron</p>
               <p><strong>House rules:</strong></p>
               <ul class="bullets">
                 <li>No glass near the pool</li>
@@ -454,8 +454,8 @@
             <ul class="bullets">
               <!-- Assuming trip is March 13–16, 2026. -->
               <!-- Assuming deposits relate to the upcoming trip: 2025 -> 2026. -->
-              <li>Deposit 1 due: <b>Thu, Nov 20, 2025</b></li>
-              <li>Deposit 2 due: <b>Wed, Dec 10, 2025</b></li>
+              <li>Deposit 1 ($360) due: <b>Tue, Nov 25, 2025</b></li>
+              <li>Deposit 2 ($380) due: <b>Wed, Dec 10, 2025</b></li>
               <li>Visa & Ticket Reminder: <b>Thu, Jan 1, 2026</b></li>
 
               <li>
@@ -487,9 +487,9 @@
           </div>
           <div class="face back center">
             <p style="margin:0 0 14px; color: var(--muted);">
-              ~$500 outside of travel expenses
+              ~$740 outside of travel expenses
               <br />
-              <small>(dependent on the # of people who RSVP!)</small>
+              <small>($360 first deposit, $380 second deposit)</small>
             </p>
             <div class="card-actions">
               <button class="expand-btn" data-open="budgetModal" aria-haspopup="dialog">
@@ -522,7 +522,7 @@
 
               <div>
                 <label for="attendeeCount" class="toolbar-head">People (for per-person)</label>
-                <input id="attendeeCount" type="number" min="1" value="10" style="width:100px; background:#0d2230; color:var(--text); border:1px solid #1e4152; border-radius:10px; padding:10px">
+                <input id="attendeeCount" type="number" min="1" max="16" value="13" style="width:100px; background:#0d2230; color:var(--text); border:1px solid #1e4152; border-radius:10px; padding:10px">
               </div>
             </div>
 
@@ -543,11 +543,137 @@
         </div>
       </dialog>
 
+      <!-- My Preferences -->
+      <section class="rsvp" id="prefsScreen">
+        <h2>My Preferences</h2>
+
+        <form id="prefsForm" novalidate>
+          <!-- Name (auto-filled) -->
+          <div class="row gap">
+            <div style="flex:1; min-width:220px">
+              <label for="prefName" class="toolbar-head">First name</label>
+              <input id="prefName" type="text" placeholder="First name" />
+            </div>
+          </div>
+
+          <!-- Dietary -->
+          <div class="block">
+            <div class="toolbar-head">🥗 Dietary restrictions (check all that apply):</div>
+            <div class="choices grid-2" id="dietaryGroup">
+              <label class="checkbox"><input type="checkbox" value="Vegetarian"> <span>Vegetarian</span></label>
+              <label class="checkbox"><input type="checkbox" value="Vegan"> <span>Vegan</span></label>
+              <label class="checkbox"><input type="checkbox" value="Pescatarian"> <span>Pescatarian</span></label>
+              <label class="checkbox"><input type="checkbox" value="Halal"> <span>Halal</span></label>
+              <label class="checkbox"><input type="checkbox" value="Kosher"> <span>Kosher</span></label>
+              <label class="checkbox"><input type="checkbox" value="Gluten-free"> <span>Gluten-free</span></label>
+              <label class="checkbox"><input type="checkbox" value="Dairy-free"> <span>Dairy-free</span></label>
+              <label class="checkbox"><input type="checkbox" value="Nut allergy"> <span>Nut allergy</span></label>
+              <label class="checkbox"><input type="checkbox" value="Shellfish allergy"> <span>Shellfish allergy</span></label>
+            </div>
+            <div class="row" style="margin-top:8px">
+              <input id="dietaryOther" type="text" placeholder="Other (optional)" />
+            </div>
+          </div>
+
+          <!-- Health notes -->
+          <div class="block">
+            <label for="healthNotes" class="toolbar-head">💊 Health considerations I should know about (optional)</label>
+            <textarea id="healthNotes" rows="3" placeholder="e.g., medications timing, allergies, mobility needs"></textarea>
+          </div>
+
+          <!-- Morning / Night / Group role / Meeting style -->
+          <div class="block">
+            <div class="toolbar-head">Which best describes you on vacation? (for room + taxi pairing)</div>
+
+            <fieldset class="fieldset">
+              <legend>☀️ Morning routine</legend>
+              <div class="choices grid-2" id="morningGroup">
+                <label class="radio"><input type="radio" name="morning" value="quiet-early"> <span>Up early, need my quiet coffee time</span></label>
+                <label class="radio"><input type="radio" name="morning" value="talkative-early"> <span>Up early and talkative</span></label>
+                <label class="radio"><input type="radio" name="morning" value="medium-riser"> <span>Medium riser, slow warm-up</span></label>
+                <label class="radio"><input type="radio" name="morning" value="late-riser"> <span>Late riser, don't talk to me until brunch</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="fieldset">
+              <legend>🌙 Nighttime vibe</legend>
+              <div class="choices grid-2" id="nightGroup">
+                <label class="radio"><input type="radio" name="night" value="early-quiet"> <span>Early sleeper, like my quiet</span></label>
+                <label class="radio"><input type="radio" name="night" value="late-chatty"> <span>Up late chatting or watching things</span></label>
+                <label class="radio"><input type="radio" name="night" value="late-calm"> <span>Up late but I keep it calm</span></label>
+                <label class="radio"><input type="radio" name="night" value="chaotic"> <span>I sleep whenever the universe allows</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="fieldset">
+              <legend>⚡ At a group gathering you're most likely to…</legend>
+              <div class="choices grid-2" id="groupRole">
+                <label class="radio"><input type="radio" name="group_role" value="starter"> <span>Start a game or conversation</span></label>
+                <label class="radio"><input type="radio" name="group_role" value="small-group"> <span>Hang with a small group</span></label>
+                <label class="radio"><input type="radio" name="group_role" value="observer"> <span>Observe quietly until pulled in</span></label>
+                <label class="radio"><input type="radio" name="group_role" value="dj"> <span>Be the DJ / vibe curator</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="fieldset">
+              <legend>💬 When meeting new people</legend>
+              <div class="choices grid-2" id="meetingStyle">
+                <label class="radio"><input type="radio" name="meet" value="love-it"> <span>I love it — I'll probably already know everyone by the end</span></label>
+                <label class="radio"><input type="radio" name="meet" value="warm-up"> <span>I warm up after a bit</span></label>
+                <label class="radio"><input type="radio" name="meet" value="deep-12"> <span>I'd rather have 1 or 2 deep convos than circulate</span></label>
+              </div>
+            </fieldset>
+          </div>
+
+          <!-- Conflict Animal -->
+          <div class="block">
+            <div class="toolbar-head">Pick your animal</div>
+            <div class="choices grid-3" id="animalGroup">
+              <label class="radio"><input type="radio" name="animal" value="lion"> <span>🦁 Lion (bold, direct, wants to fix things fast)</span></label>
+              <label class="radio"><input type="radio" name="animal" value="otter"> <span>🦦 Otter (diffuses tension with humor, avoids drama)</span></label>
+              <label class="radio"><input type="radio" name="animal" value="elephant"> <span>🐘 Elephant (remembers everything, wants harmony, slow to anger)</span></label>
+              <label class="radio"><input type="radio" name="animal" value="fox"> <span>🦊 Fox (strategic and diplomatic, keeps peace subtly)</span></label>
+              <label class="radio"><input type="radio" name="animal" value="turtle"> <span>🐢 Turtle (retreats to think, needs space before talking)</span></label>
+              <label class="radio"><input type="radio" name="animal" value="dove"> <span>🕊️ Dove (empathic, quick to forgive, hates tension)</span></label>
+            </div>
+          </div>
+
+          <!-- Let’s Be Clear -->
+          <div class="block">
+            <div class="toolbar-head">Let's Be Clear</div>
+
+            <fieldset class="fieldset">
+              <legend>🛏️ Roommate preferences</legend>
+              <div class="choices wrap" id="roommateGroup">
+                <label class="checkbox"><input type="checkbox" value="partner"> <span>My Partner</span></label>
+                <label class="checkbox"><input type="checkbox" value="same-energy"> <span>Same energy level</span></label>
+                <label class="checkbox"><input type="checkbox" value="opposite-energy"> <span>Opposite energy level (balance)</span></label>
+                <label class="checkbox"><input type="checkbox" value="any"> <span>Doesn't matter to me</span></label>
+              </div>
+            </fieldset>
+
+            <fieldset class="fieldset">
+              <legend>🚖 Taxi / Rideshare pairing</legend>
+              <div class="choices wrap" id="taxiGroup">
+                <label class="checkbox"><input type="checkbox" value="any"> <span>I'm chill with any combo</span></label>
+                <label class="checkbox"><input type="checkbox" value="carsick"> <span>I get carsick easily</span></label>
+                <label class="checkbox"><input type="checkbox" value="quiet"> <span>I like quiet rides</span></label>
+                <label class="checkbox"><input type="checkbox" value="music"> <span>I like music / conversation</span></label>
+              </div>
+            </fieldset>
+          </div>
+
+          <!-- Submit -->
+          <div class="row gap" style="margin-top:10px">
+            <button class="btn primary" id="prefsSubmitBtn" type="submit">Save Preferences</button>
+          </div>
+          <small id="prefsMsg" class="note"></small>
+        </form>
+      </section>
 
 
-
-
-      <!-- RSVP -->
+      <!--
+       RSVP 
       <section class="rsvp" id="rsvpScreen">
       <h2>RSVP</h2>
       <form id="rsvpForm" novalidate>
@@ -583,6 +709,7 @@
         <small id="rsvpMsg" class="note"></small>
       </form>
     </section>
+  -->
 
 
   <footer class="footer">

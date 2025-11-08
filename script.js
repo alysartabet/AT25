@@ -20,6 +20,49 @@ function setSessionCodename(cn) {
   if (g === 'false' || g === false) sessionStorage.setItem('tribealy::session::gender','male');
 })();
 
+
+async function verifyRsvpAllowed(rawCn) {
+  const cn = (rawCn || '').trim();
+  if (!cn) return false;
+
+  try {
+    const { data, error } = await supabase
+      .from('rsvps')
+      .select('id')
+      .eq('trip_id', 'miami-2026')   // scope to this trip
+      .ilike('codename', cn)         // case-insensitive exact match
+      .eq('cannot_attend', false)    // ✅ ONLY explicit false is allowed
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[gate][rsvp check] error:', error);
+      return false;
+    }
+    return !!data;
+  } catch (e) {
+    console.error('[gate][rsvp check] exception:', e);
+    return false;
+  }
+}
+
+
+
+(async () => {
+  const cn = inSession();
+  if (!cn) return;
+  const ok = await verifyRsvpAllowed(cn);   // ✅ same strict rule
+  if (!ok) {
+    localStorage.removeItem(ACCESS_PREFIX + cn);
+    sessionStorage.removeItem(SESSION_CODE);
+    alert("Your RSVP is missing, so access has been revoked.");
+    location.reload();
+  }
+})();
+
+
+
+
 document.addEventListener('DOMContentLoaded', async () => {
   const enterBtn      = document.getElementById('enterBtn');
   const codenameInput = document.getElementById('codenameInput');
@@ -106,14 +149,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       successSequence(cn);
     });
 
+
       // First-time key required? Validate via Supabase RPC
     async function backendFirstTimeCheck(cn, key) {
-      // Call gate_login only if this codename hasn't been granted access locally yet
-      if (accessGrantedFor(cn)) return true;
+      // If device already has access, STILL enforce RSVP before letting them in
+      if (accessGrantedFor(cn)) {
+        const ok = await verifyRsvpAllowed(cn);
+        if (!ok) {
+          setAccess(cn, false);                   // revoke local “remembered access”
+          shakePanel("You haven't RSVP'd, so you no longer have access 😢");
+          return false;
+        }
+        return true;
+      }
 
       const { data, error } = await window.supabase
         .rpc('gate_login', { p_codename: cn, p_key: key });
-      console.log('[gate_login] data:', data, 'error:', error); // TEMP for debugging
 
       if (error) {
         console.error(error);
@@ -129,14 +180,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (row.result === 'SUCCESS') {
+        const ok = await verifyRsvpAllowed(cn);
+        if (!ok) {
+          shakePanel("You haven't RSVP'd, so you no longer have access 😢");
+          setAccess(cn, false);
+          return false;
+        }
+        // ✅ Passed RSVP check — allow normal login
         setAccess(cn, true);
         sessionStorage.setItem('tribealy::session::first_name', row.first_name || '');
         sessionStorage.setItem('tribealy::session::last_name',  row.last_name  || '');
         sessionStorage.setItem('tribealy::session::nickname',   row.nickname   || '');
-        sessionStorage.setItem('tribealy::session::gender',   row.gender   || '');
+        sessionStorage.setItem('tribealy::session::gender',     row.gender     || '');
         sessionStorage.setItem('tribealy::session::profile_codename', cn);
         return true;
       }
+
 
       if (row.result === 'WRONG_KEY') {
         const n = row.attempt_count || 1;
@@ -1837,11 +1896,12 @@ function schedulePicksSync() {
 /* ====== Budget: currency & estimates (modal) ====== */
 // Base amounts in USD
 const baseCosts = [
-  ['Villa (3 nights)', 2800],
-  ['Yacht (4 hrs)', 1600],
-  ['Chef dinner', 700],
-  ['Groceries & supplies', 400],
-  ['Clubs & misc', 300]
+  ['Villa (3 nights) - with $3000 covered', 3862.45],
+  ['Yacht (4 hrs)', 2000],
+  ['Chef dinner', 1800],
+  ['Groceries & supplies', 800],
+  ['Fits', 600],
+  ['Lyfts', 600]
 ];
 // Travel estimates by origin (USD)
 const travelEst = [
@@ -1872,7 +1932,7 @@ function guessAttendeeCount(){
     const arr = JSON.parse(localStorage.getItem("tribealy::rsvp::" + (inSession() || 'guest')) || '[]');
     if (Array.isArray(arr) && arr.length > 0) return arr.length;
   } catch {}
-  return Number(attendeeCount?.value || 10);
+  return Number(attendeeCount?.value || 13);
 }
 
 function renderBudgetModal(){
@@ -1885,7 +1945,7 @@ function renderBudgetModal(){
   const tCur = convert(tUSD, cur);
 
   // attendees & per-person
-  const ppl = Math.max(1, Number(attendeeCount.value || guessAttendeeCount() || 10));
+  const ppl = Math.max(1, Number(attendeeCount.value || guessAttendeeCount() || 13));
   const perUSD = tUSD / ppl;
   const perCur = convert(perUSD, cur);
 
@@ -1922,6 +1982,98 @@ attendeeCount?.addEventListener('input', renderBudgetModal);
   if (!dlg) return;
   const obs = new MutationObserver(() => { if (dlg.open) { if (!attendeeCount.value) attendeeCount.value = String(guessAttendeeCount()); renderBudgetModal(); } });
   obs.observe(dlg, { attributes:true, attributeFilter:['open'] });
+})();
+
+
+/* ====== My Preferences (questionnaire) ====== */
+(function prefsInit(){
+  const form   = document.getElementById('prefsForm');
+  if (!form) return;
+
+  const msg    = document.getElementById('prefsMsg');
+  const nameEl = document.getElementById('prefName');
+
+  // Autofill first-name from session (falls back to nickname/first)
+  (function autofillName(){
+    const fn = (sessionStorage.getItem('tribealy::session::first_name') || '').trim();
+    const nn = (sessionStorage.getItem('tribealy::session::nickname')   || '').trim();
+    nameEl.value = fn || nn || '';
+  })();
+
+  function getCheckedValues(containerId){
+    const box = document.getElementById(containerId);
+    if (!box) return [];
+    return Array.from(box.querySelectorAll('input[type="checkbox"]:checked')).map(i => i.value);
+  }
+  function getRadioValue(name){
+    const el = form.querySelector(`input[name="${name}"]:checked`);
+    return el ? el.value : null;
+  }
+
+  function payloadFromUI(){
+    const dietaryList = getCheckedValues('dietaryGroup');
+    const dietaryOther = (document.getElementById('dietaryOther')?.value || '').trim();
+    if (dietaryOther) dietaryList.push(dietaryOther);
+
+    const roommate = {};
+    getCheckedValues('roommateGroup').forEach(v => roommate[v] = true);
+
+    const taxi = {};
+    getCheckedValues('taxiGroup').forEach(v => taxi[v] = true);
+
+    return {
+      name: (nameEl.value || '').trim() || null,
+
+      dietary: { list: dietaryList, other: dietaryOther || null },
+      health_notes: (document.getElementById('healthNotes')?.value || '').trim() || null,
+
+      morning_routine: getRadioValue('morning'),
+      night_vibe:      getRadioValue('night'),
+      group_role:      getRadioValue('group_role'),
+      meeting_style:   getRadioValue('meet'),
+      conflict_animal: getRadioValue('animal'),
+
+      roommate,
+      taxi
+    };
+  }
+
+  const PREFS_KEY = "tribealy::prefs::";
+  const prefsKey = () => PREFS_KEY + (inSession() || 'guest');
+
+  function saveLocal(payload){
+    try { localStorage.setItem(prefsKey(), JSON.stringify({ ...payload, ts: Date.now() })); }
+    catch {}
+  }
+
+  async function syncToBackend(payload){
+    try {
+      const cn = (inSession() || '').trim();
+      if (!cn) return false;
+      const { data, error } = await window.supabase.rpc('upsert_preferences', {
+        p_trip_id: 'miami-2026',
+        p_codename: cn,
+        p_payload: payload
+      });
+      if (error) { console.error('[prefs][rpc]', error); return false; }
+      return !!data;
+    } catch (e) {
+      console.error('[prefs][exception]', e);
+      return false;
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+
+    const payload = payloadFromUI();
+    saveLocal(payload);
+
+    const ok = await syncToBackend(payload);
+    msg.textContent = ok ? 'Preferences saved! 🙌' : "Saved locally — will sync once you're logged in/online.";
+    setTimeout(()=> msg.textContent = '', 2600);
+  });
 })();
 
 /* ====== RSVP (cannot-attend flow + RPC) — DEBUG INSTRUMENTED ====== */
@@ -2160,6 +2312,202 @@ rsvpNoBtn?.addEventListener('click', async () => {
   }
 });
 
+
+/* ====== Small QoL: Close modals on backdrop click ====== */
+document.querySelectorAll('dialog.modal').forEach(dlg=>{
+  dlg.addEventListener('click', (e)=>{
+    const path = e.composedPath();
+    const clickedInsideCard = path.some(el => el?.classList?.contains('modal-card'));
+    if (!clickedInsideCard) dlg.close();
+  });
+});
+
+
+// Close modal on '✕' or footer Close
+document.addEventListener('click', (e) => {
+  const close = e.target.closest('.close-modal');
+  if (!close) return;
+  const dlg = e.target.closest('dialog.modal');
+  if (dlg) dlg.close();
+});
+
+// (You already have: click outside .modal-card closes the dialog)
+
+/* ====== Accessibility: if no session, block interactions ====== */
+document.addEventListener('click', (e)=>{
+  // allow interactions if session exists
+  if (sessionStorage.getItem(SESSION_CODE)) return;
+
+  // allow while reveal title is showing
+  const reveal = document.getElementById('reveal');
+  if (reveal && reveal.style.display !== 'none') return;
+
+  const withinGate = e.target.closest('#gate');
+  if (!withinGate) {
+    e.preventDefault();
+    e.stopPropagation();
+    const gate = document.getElementById('gate');
+    if (gate) gate.style.display = 'grid';
+  }
+}, true);
+
+/* ====== Logout / Switch Codename ====== */
+function clearSessionProfile(){
+  ['first_name','last_name','nickname','gender','profile_codename']
+    .forEach(k => sessionStorage.removeItem(`tribealy::session::${k}`));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const logoutBtn = document.getElementById('logoutBtn');
+  const gate      = document.getElementById('gate');
+  const mainApp   = document.getElementById('main');
+  const reveal    = document.getElementById('reveal');
+  const enterBtn  = document.getElementById('enterBtn');
+  const codenameInput = document.getElementById('codenameInput');
+  const keyInput      = document.getElementById('keyInput');
+  const keyRow        = document.getElementById('keyRow');
+
+  if (!logoutBtn) return;
+
+  logoutBtn.addEventListener('click', (e) => {
+    const hardReset = e.shiftKey || e.altKey || e.metaKey; // hold Shift for full reset
+    const topbar = document.getElementById('topbar');
+
+    // 1️⃣ Clear session codename
+    sessionStorage.removeItem(SESSION_CODE);
+    clearSessionProfile();
+
+    // 2️⃣ Optionally clear stored access if hard reset
+    if (hardReset) {
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith(ACCESS_PREFIX)) localStorage.removeItem(k);
+      });
+    }
+
+    // 3️⃣ Hide the app again
+    mainApp.classList.remove('show');
+    mainApp.classList.add('hidden');
+    topbar?.classList.add('hidden');
+
+    // 4️⃣ Hide reveal layer if it was visible
+    if (reveal) {
+      reveal.classList.remove('show', 'hide');
+      reveal.style.display = 'none';
+    }
+
+    // 5️⃣ Reset the gate visuals
+    gate.style.display = 'grid';
+    gate.style.opacity = '1';
+    gate.classList.remove('gate-burning');
+    if (enterBtn) enterBtn.classList.remove('burning');
+
+    // 6️⃣ Reset inputs
+    if (codenameInput) codenameInput.value = '';
+    if (keyInput) keyInput.value = '';
+
+    // 7️⃣ Decide if key field shows (based on whether hard reset)
+    keyRow.style.display = hardReset ? 'block' : 'none';
+
+    // 8️⃣ Focus for easy re-entry
+    if (codenameInput) codenameInput.focus();
+  });
+});
+
+
+
+
+
+/*
+// ===== DEBUG RSVP DIAGNOSTICS =====
+window.DEBUG_RSVP = true;
+
+async function debugRsvp(cnRaw) {
+  const cn = (cnRaw || '').trim();
+  console.log('%c[RSVP DEBUG] begin', 'color:#7fd3ff');
+  console.log('[RSVP DEBUG] input cn:', JSON.stringify(cn));
+
+  // 1) Does the table even allow reads from anon?
+  let ping1 = await supabase.from('rsvps').select('id', { count: 'exact', head: true });
+  if (ping1.error) console.warn('[RSVP DEBUG] RLS/permission error head-select:', ping1.error);
+
+  // 2) Fetch rows by codename (no trip/cannot_attend filters yet)
+  const q2 = await supabase
+    .from('rsvps')
+    .select('id, codename, trip_id, cannot_attend, created_at')
+    .ilike('codename', cn);
+  console.log('[RSVP DEBUG] rows for codename (no filters):', q2);
+  if (q2.data && q2.data.length) console.table(q2.data);
+
+  // 3) Strict filter actually used by verify (toggle trip filter if needed)
+  let q3 = supabase
+    .from('rsvps')
+    .select('id, codename, trip_id, cannot_attend, created_at')
+    .ilike('codename', cn)
+    .eq('cannot_attend', false);
+
+  // If you really have a trip_id column/value, keep this. If not, comment the next line.
+  q3 = q3.eq('trip_id', 'miami-2026');
+
+  const r3 = await q3.maybeSingle();
+  console.log('[RSVP DEBUG] strict filter result (must match to allow):', r3);
+  if (r3.data) console.table([r3.data]);
+
+  // 4) Types sanity check (boolean vs string/null)
+  if (q2.data && q2.data.length) {
+    console.log('[RSVP DEBUG] typeof cannot_attend for each row:');
+    console.table(q2.data.map(r => ({
+      id: r.id, codename: r.codename, cannot_attend: r.cannot_attend,
+      type: typeof r.cannot_attend, trip_id: r.trip_id
+    })));
+  }
+
+  console.log('%c[RSVP DEBUG] end', 'color:#7fd3ff');
+}
+
+// Call this whenever user hits Enter on the gate
+// (You likely have an enter handler already—drop this inside it)
+async function debugGatePath(cn) {
+  console.log('%c[GATE DEBUG] start', 'color:#ff8c53');
+  console.log('[GATE DEBUG] inSession():', inSession());
+  console.log('[GATE DEBUG] accessGrantedFor(cn):', accessGrantedFor(cn));
+
+  await debugRsvp(cn);
+
+  const ok = await verifyRsvpAllowed(cn);
+  console.log('[GATE DEBUG] verifyRsvpAllowed(cn) =>', ok);
+
+  console.log('%c[GATE DEBUG] end', 'color:#ff8c53');
+}
+
+
+
+async function verifyRsvpAllowed(rawCn) {
+  const cn = (rawCn || '').trim();
+  if (!cn) return false;
+
+  try {
+    // If you’re not 100% sure trip_id exists/equals miami-2026, comment that line for now.
+    let q = supabase
+      .from('rsvps')
+      .select('id, codename, trip_id, cannot_attend, created_at')
+      .ilike('codename', cn)
+      .eq('cannot_attend', false);
+      // .eq('trip_id', 'miami-2026'); // ← comment out to test quickly
+
+    const { data, error } = await q.maybeSingle();
+    if (window.DEBUG_RSVP) console.log('[verifyRsvpAllowed] result:', { data, error });
+
+    if (error) return false;
+    return !!data;  // true only if a row exists with cannot_attend=false (and trip_id if kept)
+  } catch (e) {
+    console.error('[verifyRsvpAllowed] exception:', e);
+    return false;
+  }
+}
+  */
+
+
+
 /* ====== RSVP (cannot-attend flow + RPC) ====== */
 /*
 const rsvpForm       = document.getElementById('rsvpForm');
@@ -2384,106 +2732,3 @@ rsvpForm.addEventListener('submit', async (e)=>{
   setTimeout(()=> rsvpMsg.textContent = '', 2600);
 });
 */
-
-
-/* ====== Small QoL: Close modals on backdrop click ====== */
-document.querySelectorAll('dialog.modal').forEach(dlg=>{
-  dlg.addEventListener('click', (e)=>{
-    const path = e.composedPath();
-    const clickedInsideCard = path.some(el => el?.classList?.contains('modal-card'));
-    if (!clickedInsideCard) dlg.close();
-  });
-});
-
-
-// Close modal on '✕' or footer Close
-document.addEventListener('click', (e) => {
-  const close = e.target.closest('.close-modal');
-  if (!close) return;
-  const dlg = e.target.closest('dialog.modal');
-  if (dlg) dlg.close();
-});
-
-// (You already have: click outside .modal-card closes the dialog)
-
-/* ====== Accessibility: if no session, block interactions ====== */
-document.addEventListener('click', (e)=>{
-  // allow interactions if session exists
-  if (sessionStorage.getItem(SESSION_CODE)) return;
-
-  // allow while reveal title is showing
-  const reveal = document.getElementById('reveal');
-  if (reveal && reveal.style.display !== 'none') return;
-
-  const withinGate = e.target.closest('#gate');
-  if (!withinGate) {
-    e.preventDefault();
-    e.stopPropagation();
-    const gate = document.getElementById('gate');
-    if (gate) gate.style.display = 'grid';
-  }
-}, true);
-
-/* ====== Logout / Switch Codename ====== */
-function clearSessionProfile(){
-  ['first_name','last_name','nickname','gender','profile_codename']
-    .forEach(k => sessionStorage.removeItem(`tribealy::session::${k}`));
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-  const logoutBtn = document.getElementById('logoutBtn');
-  const gate      = document.getElementById('gate');
-  const mainApp   = document.getElementById('main');
-  const reveal    = document.getElementById('reveal');
-  const enterBtn  = document.getElementById('enterBtn');
-  const codenameInput = document.getElementById('codenameInput');
-  const keyInput      = document.getElementById('keyInput');
-  const keyRow        = document.getElementById('keyRow');
-
-  if (!logoutBtn) return;
-
-  logoutBtn.addEventListener('click', (e) => {
-    const hardReset = e.shiftKey || e.altKey || e.metaKey; // hold Shift for full reset
-    const topbar = document.getElementById('topbar');
-
-    // 1️⃣ Clear session codename
-    sessionStorage.removeItem(SESSION_CODE);
-    clearSessionProfile();
-
-    // 2️⃣ Optionally clear stored access if hard reset
-    if (hardReset) {
-      Object.keys(localStorage).forEach(k => {
-        if (k.startsWith(ACCESS_PREFIX)) localStorage.removeItem(k);
-      });
-    }
-
-    // 3️⃣ Hide the app again
-    mainApp.classList.remove('show');
-    mainApp.classList.add('hidden');
-    topbar?.classList.add('hidden');
-
-    // 4️⃣ Hide reveal layer if it was visible
-    if (reveal) {
-      reveal.classList.remove('show', 'hide');
-      reveal.style.display = 'none';
-    }
-
-    // 5️⃣ Reset the gate visuals
-    gate.style.display = 'grid';
-    gate.style.opacity = '1';
-    gate.classList.remove('gate-burning');
-    if (enterBtn) enterBtn.classList.remove('burning');
-
-    // 6️⃣ Reset inputs
-    if (codenameInput) codenameInput.value = '';
-    if (keyInput) keyInput.value = '';
-
-    // 7️⃣ Decide if key field shows (based on whether hard reset)
-    keyRow.style.display = hardReset ? 'block' : 'none';
-
-    // 8️⃣ Focus for easy re-entry
-    if (codenameInput) codenameInput.focus();
-  });
-});
-
-
