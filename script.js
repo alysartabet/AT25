@@ -1896,12 +1896,12 @@ function schedulePicksSync() {
 /* ====== Budget: currency & estimates (modal) ====== */
 // Base amounts in USD
 const baseCosts = [
-  ['Villa (3 nights) - with $3000 covered', 3862.45],
+  ['Villa (3 nights) - with $3000 covered', 4362.45],
   ['Yacht (4 hrs)', 2000],
   ['Chef dinner', 1800],
-  ['Groceries & supplies', 800],
-  ['Fits', 600],
-  ['Lyfts', 600]
+  ['Groceries & supplies', 850],
+  ['Fits', 700],
+  ['Lyfts', 700]
 ];
 // Travel estimates by origin (USD)
 const travelEst = [
