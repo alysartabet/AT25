@@ -1896,19 +1896,17 @@ function schedulePicksSync() {
 /* ====== Budget: currency & estimates (modal) ====== */
 // Base amounts in USD
 const baseCosts = [
-  ['Villa (3 nights) - with $3000 covered', 4362.45],
-  ['Yacht (4 hrs)', 2000],
+  ['Villa (3 nights) - with $3000 covered', 4025],
+  ['Yacht (4 hrs)', 1919],
   ['Chef dinner', 1800],
   ['Groceries & supplies', 850],
-  ['Fits', 700],
-  ['Lyfts', 700]
+  ['Fits', 800],
 ];
 // Travel estimates by origin (USD)
 const travelEst = [
   ['Travel — Nigeria', 1200],
   ['Travel — UK', 700],
-  ['Travel — NYC', 250],
-  ['Travel — Japan', 1400]
+  ['Travel — NYC', 250]
 ];
 
 // FX rates (tune as needed)
@@ -1932,7 +1930,7 @@ function guessAttendeeCount(){
     const arr = JSON.parse(localStorage.getItem("tribealy::rsvp::" + (inSession() || 'guest')) || '[]');
     if (Array.isArray(arr) && arr.length > 0) return arr.length;
   } catch {}
-  return Number(attendeeCount?.value || 13);
+  return Number(attendeeCount?.value || 10);
 }
 
 function renderBudgetModal(){
@@ -1945,7 +1943,7 @@ function renderBudgetModal(){
   const tCur = convert(tUSD, cur);
 
   // attendees & per-person
-  const ppl = Math.max(1, Number(attendeeCount.value || guessAttendeeCount() || 13));
+  const ppl = Math.max(1, Number(attendeeCount.value || guessAttendeeCount() ||10));
   const perUSD = tUSD / ppl;
   const perCur = convert(perUSD, cur);
 
